@@ -141,7 +141,7 @@ export default function TravelBuddies() {
   return (
     <div style={{ backgroundColor: bgColor }} className="min-h-screen text-stone-800 font-sans relative transition-colors duration-700">
       
-      {/* --- 全局列印樣式：隱藏四角資訊 + 頁碼 --- */}
+      {/* --- 全局列印樣式：隱藏四角資訊 + 頁碼 + 修正背景色 --- */}
       <style jsx global>{`
         @page {
           size: auto;
@@ -149,9 +149,11 @@ export default function TravelBuddies() {
         }
         @media print {
           body {
-            background-color: white !important;
+            /* 修正：移除強制白色背景，允許打印背景色 */
             padding: 0;
             counter-reset: pageNumber; /* 重設頁碼 */
+            -webkit-print-color-adjust: exact !important; /* 強制 iPhone/Safari 印出背景色 */
+            print-color-adjust: exact !important;
           }
           .no-print { display: none !important; }
           .page-break { 
@@ -188,34 +190,37 @@ export default function TravelBuddies() {
         </div>
       </section>
 
-      {/* 2. 行程清單 (響應式設計) */}
+      {/* 2. 行程清單 (響應式設計：縮小手機版字級) */}
       <main className="w-full max-w-7xl mx-auto py-20 md:py-48 px-6 md:px-10 space-y-32 md:space-y-64 relative">
         <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-stone-200/10 to-transparent pointer-events-none no-print"></div>
 
         {itinerary.map((item, index) => (
-          <section key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-24 items-start page-break">
+          <section key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-24 items-start page-break">
             
             {/* 左側：文字 (手機上會堆疊到上方) */}
             <div className="md:col-span-5 md:sticky md:top-24 space-y-8 md:space-y-12">
               <div className="flex items-center gap-6">
-                <span className="text-4xl md:text-6xl font-serif italic text-stone-200/60">0{index + 1}</span>
+                {/* 修正：縮小手機版索引數字 */}
+                <span className="text-3xl md:text-6xl font-serif italic text-stone-200/60">0{index + 1}</span>
                 <div className="h-[0.5px] flex-1 bg-stone-200/50"></div>
               </div>
 
+              {/* 修正：縮小手機版標題字級 */}
               <UniversalDesigner 
                 label="標題" html={item.title} 
                 onSave={(v) => handleUpdate(item.id, 'title', v)}
-                className="text-4xl md:text-7xl font-serif font-bold text-stone-900 leading-tight block"
+                className="text-3xl md:text-7xl font-serif font-bold text-stone-900 leading-tight block"
               />
 
-              <div className="flex flex-col gap-4 font-mono text-[10px] md:text-[11px] text-stone-400 tracking-[0.4em] uppercase">
+              <div className="flex flex-col gap-4 font-mono text-[9px] md:text-[11px] text-stone-400 tracking-[0.4em] uppercase">
                 <div className="flex gap-6 items-center"><span>DATE</span><UniversalDesigner html={item.date} onSave={(v) => handleUpdate(item.id, 'date', v)} className="text-stone-800" /></div>
                 <div className="flex gap-6 items-center"><span>TIME</span><UniversalDesigner html={item.time_slot} onSave={(v) => handleUpdate(item.id, 'time_slot', v)} className="text-stone-800 font-bold" /></div>
               </div>
 
               <div className="bg-white/30 backdrop-blur-sm p-8 md:p-12 rounded-[3rem] md:rounded-[4rem] border border-stone-200/40 shadow-inner">
                 <p className="text-[9px] font-black uppercase tracking-[0.5em] text-stone-400/50 mb-6 italic">溫馨提醒</p>
-                <UniversalDesigner label="提醒" html={item.guideline} onSave={(v) => handleUpdate(item.id, 'guideline', v)} className="text-base md:text-lg leading-relaxed text-stone-700 italic" />
+                {/* 修正：縮小手機版提醒字級 */}
+                <UniversalDesigner label="提醒" html={item.guideline} onSave={(v) => handleUpdate(item.id, 'guideline', v)} className="text-sm md:text-lg leading-relaxed text-stone-700 italic" />
               </div>
 
               <div className="flex gap-4 no-print">
@@ -224,7 +229,7 @@ export default function TravelBuddies() {
               </div>
             </div>
 
-            {/* 右側：照片 (手機上會堆疊到上方) */}
+            {/* 右側：照片 (手機上會堆疊到下方) */}
             <div className="md:col-span-7 space-y-16 md:space-y-24">
               <div className="grid grid-cols-1 gap-10">
                 {item.photo_urls?.length > 0 ? (
@@ -239,7 +244,8 @@ export default function TravelBuddies() {
               </div>
               <div className="pt-12 md:pt-20 border-t border-stone-200/50">
                 <label className="text-[10px] font-black text-stone-300 uppercase tracking-[0.7em] mb-6 block italic opacity-60">Personal Diary</label>
-                <UniversalDesigner label="日誌" html={item.thoughts} onSave={(v) => handleUpdate(item.id, 'thoughts', v)} className="min-h-[120px] text-xl md:text-2xl font-serif italic text-stone-500 leading-relaxed" />
+                {/* 修正：縮小手機版日誌字級 */}
+                <UniversalDesigner label="日誌" html={item.thoughts} onSave={(v) => handleUpdate(item.id, 'thoughts', v)} className="min-h-[120px] text-lg md:text-2xl font-serif italic text-stone-500 leading-relaxed" />
               </div>
             </div>
           </section>
