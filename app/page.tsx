@@ -68,7 +68,7 @@ function UniversalDesigner({
             <div className="flex gap-2 flex-shrink-0">
               <button onMouseDown={(e) => exec(e, 'foreColor', '#1c1917')} className="w-6 h-6 rounded-full bg-stone-900 border border-white"></button>
               <button onMouseDown={(e) => exec(e, 'foreColor', '#b08d57')} className="w-6 h-6 rounded-full bg-[#b08d57] border border-white"></button>
-              <input type="color" onChange={(e) => exec(e, 'foreColor', e.target.value)} className="w-6 h-6 rounded-md cursor-pointer bg-transparent" />
+              <input type="color" onChange={(e) => exec(e, 'foreColor', (e.target as HTMLInputElement).value)} className="w-6 h-6 rounded-md cursor-pointer bg-transparent" />
             </div>
             <button onClick={() => setIsEditing(false)} className="ml-auto text-stone-300 text-xl">✕</button>
           </div>
@@ -220,11 +220,11 @@ export default function TravelBuddies() {
 
               <div className="flex gap-4 no-print">
                 <a href={item.google_maps_url} target="_blank" className="flex-1 text-center py-5 bg-stone-900 text-stone-50 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase shadow-xl">📍 MAP</a>
-                <label className="flex-1 text-center py-5 border border-stone-300 text-stone-800 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase cursor-pointer">📷 PHOTO<input type="file" accept="image/*" capture="camera" className="hidden" onChange={(e) => handleUpload(item.id, e.target.files?.[0], item.photo_urls)} /></label>
+                <label className="flex-1 text-center py-5 border border-stone-300 text-stone-800 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase cursor-pointer">📷 PHOTO<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleUpload(item.id, e.target.files?.[0], item.photo_urls)} /></label>
               </div>
             </div>
 
-            {/* 右側：照片 (手機上會堆疊到下方) */}
+            {/* 右側：照片 (手機上會堆疊到上方) */}
             <div className="md:col-span-7 space-y-16 md:space-y-24">
               <div className="grid grid-cols-1 gap-10">
                 {item.photo_urls?.length > 0 ? (
