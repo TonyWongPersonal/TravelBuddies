@@ -24,3 +24,51 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+@media print {
+  /* 隱藏所有按鈕和不需要的 UI */
+  .no-print, button, label, a, input, textarea::placeholder {
+    display: none !important;
+  }
+
+  body {
+    background-color: white !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* 每一天行程強制分頁 */
+  section {
+    page-break-after: always;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 2rem !important;
+  }
+
+  /* 讓 Textarea 顯示出文字內容 */
+  textarea {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    resize: none;
+  }
+
+  /* 照片排版 */
+  .grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+@media print {
+  .print-cover {
+    height: 100vh !important;
+    page-break-after: always !important;
+    display: flex !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
