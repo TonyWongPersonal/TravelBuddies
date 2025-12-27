@@ -15,7 +15,7 @@ interface ItineraryItem {
   google_maps_url: string
 }
 
-// --- 【全能設計器】適配移動端 ---
+// --- 【設計器】優化手機端編輯體驗 ---
 function UniversalDesigner({ 
   html, 
   onSave, 
@@ -55,26 +55,25 @@ function UniversalDesigner({
 
   if (isEditing) {
     return (
-      <div className="fixed inset-0 z-[500] bg-stone-900/40 backdrop-blur-xl flex items-center justify-center p-0 md:p-6 no-print">
+      <div className="fixed inset-0 z-[500] bg-stone-900/40 backdrop-blur-md flex items-center justify-center p-0 md:p-6 no-print">
         <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col">
-          {/* 工具列 - 在手機上可滾動 */}
           <div className="p-4 md:p-8 border-b border-stone-100 flex overflow-x-auto gap-4 items-center bg-stone-50/50 scrollbar-hide">
             <div className="flex items-center gap-2 flex-shrink-0">
               {[24, 32, 48, 64].map((size) => (
-                <button key={size} onMouseDown={(e) => setFontSize(e, size.toString())} className="w-8 h-8 rounded-lg bg-white border border-stone-100 text-[10px] font-bold">{size}</button>
+                <button key={size} onMouseDown={(e) => setFontSize(e, size.toString())} className="w-10 h-10 rounded-lg bg-white border border-stone-100 text-[12px] font-bold active:bg-stone-100">{size}</button>
               ))}
             </div>
             <div className="w-[1px] h-6 bg-stone-200 flex-shrink-0"></div>
             <div className="flex gap-2 flex-shrink-0">
-              <button onMouseDown={(e) => exec(e, 'foreColor', '#1c1917')} className="w-6 h-6 rounded-full bg-stone-900 border border-white"></button>
-              <button onMouseDown={(e) => exec(e, 'foreColor', '#b08d57')} className="w-6 h-6 rounded-full bg-[#b08d57] border border-white"></button>
-              <input type="color" onChange={(e) => exec(e, 'foreColor', (e.target as HTMLInputElement).value)} className="w-6 h-6 rounded-md cursor-pointer bg-transparent" />
+              <button onMouseDown={(e) => exec(e, 'foreColor', '#1c1917')} className="w-8 h-8 rounded-full bg-stone-900 border border-white shadow-sm"></button>
+              <button onMouseDown={(e) => exec(e, 'foreColor', '#b08d57')} className="w-8 h-8 rounded-full bg-[#b08d57] border border-white shadow-sm"></button>
+              <input type="color" onChange={(e) => exec(e, 'foreColor', (e.target as HTMLInputElement).value)} className="w-8 h-8 rounded-md cursor-pointer bg-transparent" />
             </div>
-            <button onClick={() => setIsEditing(false)} className="ml-auto text-stone-300 text-xl">✕</button>
+            <button onClick={() => setIsEditing(false)} className="ml-auto p-2 text-stone-300 text-2xl">✕</button>
           </div>
           <div ref={editorRef} contentEditable dangerouslySetInnerHTML={{ __html: html }} className="flex-1 p-8 md:p-12 focus:outline-none text-xl leading-relaxed text-stone-800 overflow-y-auto" />
           <div className="p-6 md:p-8 border-t border-stone-50 flex justify-end bg-white">
-            <button onClick={handleSave} className="w-full md:w-auto bg-stone-900 text-white px-10 py-4 rounded-full font-bold text-[10px] uppercase tracking-widest shadow-xl">Save Design</button>
+            <button onClick={handleSave} className="w-full md:w-auto bg-stone-900 text-white px-10 py-5 rounded-full font-bold text-[12px] uppercase tracking-widest shadow-xl active:scale-95">Save Design</button>
           </div>
         </div>
       </div>
@@ -82,7 +81,7 @@ function UniversalDesigner({
   }
 
   return (
-    <div onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-stone-200/40 transition-all rounded-2xl p-2 -m-2 ${className}`} dangerouslySetInnerHTML={{ __html: html || `<span class="text-stone-300 italic">Click to design ${label}</span>` }} />
+    <div onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-stone-200/40 transition-all rounded-2xl p-2 -m-2 ${className}`} dangerouslySetInnerHTML={{ __html: html || `<span class="text-stone-300 italic">Edit ${label}</span>` }} />
   )
 }
 
@@ -111,6 +110,8 @@ export default function TravelBuddies() {
     try {
       const { data, error } = await supabase.from('honeymoon_itinerary').select('*')
       if (data) setItinerary(sortList(data))
+    } catch (e) {
+      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -124,7 +125,7 @@ export default function TravelBuddies() {
   async function handleUpdate(id: string, field: keyof ItineraryItem, value: any) {
     const updated = itinerary.map(item => item.id === id ? { ...item, [field]: value } : item)
     setItinerary(sortList(updated))
-    await supabase.from('honeymoon_itinerary').update({ [field]: value }).eq( 'id', id)
+    await supabase.from('honeymoon_itinerary').update({ [field]: value }).eq('id', id)
   }
 
   async function handleUpload(id: string, file: File | undefined, currentPhotos: string[]) {
@@ -136,23 +137,18 @@ export default function TravelBuddies() {
     await handleUpdate(id, 'photo_urls', newPhotos)
   }
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#f7f3ed] font-serif text-stone-300">Journaling...</div>
+  if (loading) return <div className="h-screen flex items-center justify-center bg-[#f7f3ed] font-serif text-stone-300 animate-pulse">Journaling...</div>
 
   return (
     <div style={{ backgroundColor: bgColor }} className="min-h-screen text-stone-800 font-sans relative transition-colors duration-700">
       
-      {/* --- 全局列印樣式：隱藏四角資訊 + 頁碼 + 修正背景色 --- */}
+      {/* --- 修正：強制打印背景色與頁碼 --- */}
       <style jsx global>{`
-        @page {
-          size: auto;
-          margin: 0; /* 強制移除瀏覽器預設的 header/footer */
-        }
+        @page { size: auto; margin: 0; }
         @media print {
-          body {
-            /* 修正：移除強制白色背景，允許打印背景色 */
-            padding: 0;
-            counter-reset: pageNumber; /* 重設頁碼 */
-            -webkit-print-color-adjust: exact !important; /* 強制 iPhone/Safari 印出背景色 */
+          body, html, .min-h-screen { 
+            background-color: ${bgColor} !important; 
+            -webkit-print-color-adjust: exact !important; 
             print-color-adjust: exact !important;
           }
           .no-print { display: none !important; }
@@ -161,9 +157,7 @@ export default function TravelBuddies() {
             padding: 40px !important;
             min-height: 100vh;
             position: relative;
-            counter-increment: pageNumber; /* 行程頁面增加頁碼 */
           }
-          /* 顯示頁碼：左下角 */
           .page-break::after {
             content: "Page " counter(pageNumber);
             position: absolute;
@@ -173,102 +167,97 @@ export default function TravelBuddies() {
             font-size: 10px;
             color: #999;
           }
-          .cover-page { 
-            counter-increment: none; /* 封面不計入頁碼 */
-          }
-          .cover-page::after { content: "" !important; } /* 封面不顯示頁碼 */
+          body { counter-reset: pageNumber; }
+          .page-break { counter-increment: pageNumber; }
+          .cover-page { counter-increment: none; }
+          .cover-page::after { content: "" !important; }
         }
       `}</style>
 
-      {/* 1. 封面區 (適配手機) */}
+      {/* 1. 封面區 */}
       <section className="h-screen w-full relative flex items-center justify-center overflow-hidden cover-page">
         <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" alt="Cover" />
-        <div className="absolute left-6 md:left-10 top-[45%] flex flex-col items-center gap-6 no-print">
+        <div className="absolute left-6 md:left-10 top-[40%] flex flex-col items-center gap-6 no-print">
           <div className="h-12 md:h-20 w-[0.5px] bg-stone-400/30"></div>
           <h1 className="[writing-mode:vertical-lr] text-[10px] md:text-xs font-serif font-bold tracking-[0.5em] text-stone-800/60 rotate-180 uppercase">TRAVEL BUDDIES</h1>
           <div className="h-12 md:h-20 w-[0.5px] bg-stone-400/30"></div>
         </div>
       </section>
 
-      {/* 2. 行程清單 (響應式設計：縮小手機版字級) */}
-      <main className="w-full max-w-7xl mx-auto py-20 md:py-48 px-6 md:px-10 space-y-32 md:space-y-64 relative">
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-stone-200/10 to-transparent pointer-events-none no-print"></div>
-
+      {/* 2. 行程清單 - 優化響應式字級 */}
+      <main className="w-full max-w-7xl mx-auto py-16 md:py-48 px-5 md:px-10 space-y-24 md:space-y-64 relative">
         {itinerary.map((item, index) => (
-          <section key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-24 items-start page-break">
+          <section key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-24 items-start page-break">
             
-            {/* 左側：文字 (手機上會堆疊到上方) */}
-            <div className="md:col-span-5 md:sticky md:top-24 space-y-8 md:space-y-12">
+            <div className="md:col-span-5 md:sticky md:top-24 space-y-6 md:space-y-12">
               <div className="flex items-center gap-6">
-                {/* 修正：縮小手機版索引數字 */}
                 <span className="text-3xl md:text-6xl font-serif italic text-stone-200/60">0{index + 1}</span>
                 <div className="h-[0.5px] flex-1 bg-stone-200/50"></div>
               </div>
 
-              {/* 修正：縮小手機版標題字級 */}
+              {/* 修正：手機端標題字級由 text-4xl 降為 text-3xl */}
               <UniversalDesigner 
                 label="標題" html={item.title} 
                 onSave={(v) => handleUpdate(item.id, 'title', v)}
                 className="text-3xl md:text-7xl font-serif font-bold text-stone-900 leading-tight block"
               />
 
-              <div className="flex flex-col gap-4 font-mono text-[9px] md:text-[11px] text-stone-400 tracking-[0.4em] uppercase">
-                <div className="flex gap-6 items-center"><span>DATE</span><UniversalDesigner html={item.date} onSave={(v) => handleUpdate(item.id, 'date', v)} className="text-stone-800" /></div>
-                <div className="flex gap-6 items-center"><span>TIME</span><UniversalDesigner html={item.time_slot} onSave={(v) => handleUpdate(item.id, 'time_slot', v)} className="text-stone-800 font-bold" /></div>
+              <div className="flex flex-col gap-3 font-mono text-[10px] md:text-[11px] text-stone-400 tracking-[0.4em] uppercase">
+                <div className="flex gap-4 items-center"><span>DATE</span><UniversalDesigner html={item.date} onSave={(v) => handleUpdate(item.id, 'date', v)} className="text-stone-800" /></div>
+                <div className="flex gap-4 items-center"><span>TIME</span><UniversalDesigner html={item.time_slot} onSave={(v) => handleUpdate(item.id, 'time_slot', v)} className="text-stone-800 font-bold" /></div>
               </div>
 
-              <div className="bg-white/30 backdrop-blur-sm p-8 md:p-12 rounded-[3rem] md:rounded-[4rem] border border-stone-200/40 shadow-inner">
-                <p className="text-[9px] font-black uppercase tracking-[0.5em] text-stone-400/50 mb-6 italic">溫馨提醒</p>
-                {/* 修正：縮小手機版提醒字級 */}
+              <div className="bg-white/30 backdrop-blur-sm p-6 md:p-12 rounded-[2.5rem] md:rounded-[4rem] border border-stone-200/40 shadow-inner">
+                <p className="text-[9px] font-black uppercase tracking-[0.5em] text-stone-400/50 mb-4 italic">溫馨提醒</p>
                 <UniversalDesigner label="提醒" html={item.guideline} onSave={(v) => handleUpdate(item.id, 'guideline', v)} className="text-sm md:text-lg leading-relaxed text-stone-700 italic" />
               </div>
 
-              <div className="flex gap-4 no-print">
-                <a href={item.google_maps_url} target="_blank" className="flex-1 text-center py-5 bg-stone-900 text-stone-50 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase shadow-xl">📍 MAP</a>
-                <label className="flex-1 text-center py-5 border border-stone-300 text-stone-800 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase cursor-pointer">📷 PHOTO<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleUpload(item.id, e.target.files?.[0], item.photo_urls)} /></label>
+              <div className="flex gap-4 no-print pt-2">
+                <a href={item.google_maps_url} target="_blank" className="flex-1 text-center py-4 bg-stone-900 text-stone-50 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase shadow-xl active:scale-95">📍 MAP</a>
+                <label className="flex-1 text-center py-4 border border-stone-300 text-stone-800 rounded-full font-bold text-[9px] tracking-[0.4em] uppercase cursor-pointer active:bg-white/50">📷 PHOTO<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleUpload(item.id, e.target.files?.[0], item.photo_urls)} /></label>
               </div>
             </div>
 
-            {/* 右側：照片 (手機上會堆疊到下方) */}
-            <div className="md:col-span-7 space-y-16 md:space-y-24">
-              <div className="grid grid-cols-1 gap-10">
+            <div className="md:col-span-7 space-y-12 md:space-y-24">
+              <div className="grid grid-cols-1 gap-8 md:gap-14">
                 {item.photo_urls?.length > 0 ? (
                   item.photo_urls.map((url, i) => (
-                    <div key={i} className="rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border-[8px] md:border-[16px] border-white/80 p-0.5 bg-white/40">
+                    <div key={i} className="rounded-[2rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border-[8px] md:border-[16px] border-white/80 p-0.5 bg-white/40">
                        <img src={url} className="w-full object-cover" />
                     </div>
                   ))
                 ) : (
-                  <div className="aspect-[4/3] bg-white/20 rounded-[3rem] md:rounded-[4rem] border border-dashed border-stone-300 flex items-center justify-center text-stone-300 italic font-serif">Memory...</div>
+                  <div className="aspect-[4/3] bg-white/20 rounded-[2.5rem] md:rounded-[4rem] border border-dashed border-stone-300 flex items-center justify-center text-stone-300 italic font-serif text-sm">Waiting for memory...</div>
                 )}
               </div>
-              <div className="pt-12 md:pt-20 border-t border-stone-200/50">
-                <label className="text-[10px] font-black text-stone-300 uppercase tracking-[0.7em] mb-6 block italic opacity-60">Personal Diary</label>
-                {/* 修正：縮小手機版日誌字級 */}
-                <UniversalDesigner label="日誌" html={item.thoughts} onSave={(v) => handleUpdate(item.id, 'thoughts', v)} className="min-h-[120px] text-lg md:text-2xl font-serif italic text-stone-500 leading-relaxed" />
+              <div className="pt-10 md:pt-20 border-t border-stone-200/50">
+                <label className="text-[10px] font-black text-stone-300 uppercase tracking-[0.7em] mb-6 block italic opacity-60 text-center md:text-left">Personal Diary</label>
+                <UniversalDesigner label="日誌" html={item.thoughts} onSave={(v) => handleUpdate(item.id, 'thoughts', v)} className="min-h-[100px] text-lg md:text-2xl font-serif italic text-stone-500 leading-relaxed text-center md:text-left" />
               </div>
             </div>
           </section>
         ))}
       </main>
 
-      {/* 3. 懸浮工具 (Mobile 觸控優化) */}
-      <div className="fixed bottom-6 left-6 md:bottom-12 md:left-12 flex flex-col gap-4 md:gap-6 no-print z-[300]">
+      {/* 3. 懸浮工具 - 手機端位置優化 */}
+      <div className="fixed bottom-6 left-6 md:bottom-12 md:left-12 flex flex-col gap-4 no-print z-[300]">
         {showUI && (
-          <div className="bg-white/95 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border border-stone-200 mb-2 animate-in slide-in-from-bottom-5">
-             <div className="flex items-center gap-3">
-               <input type="text" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="bg-stone-50 border-none rounded-lg px-3 py-2 text-[10px] font-mono w-24" />
-               <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-6 h-6 cursor-pointer" />
+          <div className="bg-white/95 backdrop-blur-md p-5 rounded-[2rem] shadow-2xl border border-stone-200 mb-2 animate-in slide-in-from-bottom-5">
+             <div className="flex flex-col gap-3">
+               <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">BG Color</span>
+               <div className="flex items-center gap-2">
+                 <input type="text" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="bg-stone-50 border border-stone-100 rounded-lg px-2 py-1.5 text-[10px] font-mono w-20" />
+                 <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-6 h-6 cursor-pointer" />
+               </div>
              </div>
           </div>
         )}
-        <button onClick={() => setShowUI(!showUI)} className="w-14 h-14 md:w-16 md:h-16 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-[10px] font-bold">UI</button>
-        <button onClick={addJourney} className="w-14 h-14 md:w-16 md:h-16 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-2xl active:scale-90">＋</button>
+        <button onClick={() => setShowUI(!showUI)} className="w-14 h-14 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-[10px] font-bold active:bg-stone-50 transition-colors">UI</button>
+        <button onClick={addJourney} className="w-14 h-14 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-2xl active:scale-90 transition-all">＋</button>
       </div>
 
-      {/* PDF 列印按鈕 */}
       <div className="fixed bottom-6 right-6 md:bottom-12 md:right-12 no-print z-[300]">
-        <button onClick={() => window.print()} className="w-14 h-14 md:w-16 md:h-16 bg-stone-900 text-stone-50 rounded-full shadow-2xl flex items-center justify-center font-bold text-[9px] tracking-widest active:scale-90">PDF</button>
+        <button onClick={() => window.print()} className="w-14 h-14 bg-stone-900 text-stone-50 rounded-full shadow-2xl flex items-center justify-center font-bold text-[9px] tracking-widest active:scale-95 transition-all">PDF</button>
       </div>
     </div>
   )
