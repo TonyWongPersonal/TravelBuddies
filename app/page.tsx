@@ -170,19 +170,39 @@ export default function TravelBuddies() {
       {/* 【一鍵成書：列印邏輯】強制全本背景色與分頁 */}
       <style jsx global>{`
         @media print {
-          @page { size: A4; margin: 0; }
-          body, html { background: none !important; }
-          .no-print { display: none !important; }
-          .print-container { display: block !important; }
+          @page { 
+            size: A4; 
+            margin: 0; 
+          }
+          body, html { 
+            background: none !important;
+            margin: 0;
+            padding: 0;
+          }
+          .no-print { 
+            display: none !important; 
+          }
+          .print-container { 
+            display: block !important; 
+          }
           .print-page { 
-            width: 210mm; height: 297mm; 
+            width: 210mm !important; 
+            height: 297mm !important; 
             background-color: ${bgColor} !important; 
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            page-break-after: always;
+            color-adjust: exact !important;
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
             padding: 20mm;
-            display: flex; flex-direction: column;
+            display: flex !important; 
+            flex-direction: column !important;
             box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+          }
+          .print-page:last-child {
+            page-break-after: auto !important;
           }
         }
       `}</style>
@@ -203,14 +223,9 @@ export default function TravelBuddies() {
           <div className="w-full max-w-[550px] aspect-[1/1.41] bg-white/40 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white/60 flex flex-col overflow-hidden relative">
             
             {allPages[currentPage].type === 'cover' ? (
-              // 【封面：Full 版 - 全屏顯示，圓角覆蓋整個容器】
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center overflow-hidden rounded-[3rem]">
+              // 【封面：Full 版 - 純圖片，無標題】
+              <div className="absolute inset-0 overflow-hidden rounded-[3rem]">
                  <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" />
-                 <div className="absolute inset-0 bg-black/20" />
-                 <div className="relative z-10 text-white drop-shadow-2xl px-10">
-                   <h1 className="text-5xl md:text-8xl font-serif font-bold tracking-tighter leading-none mb-6">我們的台灣<br/>三人蜜月</h1>
-                   <div className="h-1 w-20 bg-white/80 mx-auto" />
-                 </div>
               </div>
             ) : (
               // 【行程內容頁 - 優化排版】
@@ -285,17 +300,17 @@ export default function TravelBuddies() {
       </AnimatePresence>
 
       {/* 【一鍵成書：隱藏列印容器】渲染全部頁面供 PDF 使用 */}
-      <div className="hidden print-container">
+      <div className="hidden print-container" style={{display: 'none'}}>
         {allPages.map((page, idx) => (
-          <div key={idx} className="print-page">
+          <div key={`print-${idx}`} className="print-page">
             {page.type === 'cover' ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center relative">
-                 <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" style={{margin: '-20mm', width: '210mm', height: '297mm'}} />
-                 <div className="absolute inset-0 bg-black/20" style={{margin: '-20mm', width: '210mm', height: '297mm'}} />
-                 <div className="relative z-10 text-white drop-shadow-2xl">
-                   <h1 className="text-7xl font-serif font-bold tracking-tighter leading-none mb-6">我們的台灣<br/>三人蜜月</h1>
-                   <div className="h-1 w-20 bg-white/80 mx-auto" />
-                 </div>
+              <div className="flex-1 relative" style={{margin: '-20mm', width: '210mm', height: '297mm'}}>
+                 <img 
+                   src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" 
+                   className="w-full h-full object-cover" 
+                   style={{width: '210mm', height: '297mm'}}
+                   alt="Cover" 
+                 />
               </div>
             ) : (
               <div className="space-y-6">
