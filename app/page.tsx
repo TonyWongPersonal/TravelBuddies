@@ -54,13 +54,18 @@ function UniversalDesigner({ html, onSave, label = "", className = "" }: { html:
 export default function TravelBuddies() {
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
   const [bgColor, setBgColor] = useState('#ffd9b6')
   const [currentPage, setCurrentPage] = useState(0)
 
   useEffect(() => { fetchData() }, [])
 
   async function fetchData() {
-    const { data } = await supabase.from('honeymoon_itinerary').select('*')
+    const { data, error } = await supabase.from('honeymoon_itinerary').select('*')
+    if (error) {
+      console.error('❌ 獲取數據錯誤:', error)
+      alert('無法加載數據: ' + error.message)
+    }
     if (data) setItinerary(data.sort((a, b) => {
         const clean = (s: string) => s ? s.replace(/<[^>]*>/g, '').trim() : ""
         return new Date(clean(a.date)).getTime() - new Date(clean(b.date)).getTime()
@@ -71,22 +76,78 @@ export default function TravelBuddies() {
   async function handleUpdate(id: string, field: keyof ItineraryItem, value: any) {
     const updated = itinerary.map(item => item.id === id ? { ...item, [field]: value } : item)
     setItinerary(updated)
-    await supabase.from('honeymoon_itinerary').update({ [field]: value }).eq('id', id)
+    const { error } = await supabase.from('honeymoon_itinerary').update({ [field]: value }).eq('id', id)
+    if (error) {
+      console.error('❌ 更新數據錯誤:', error)
+      alert('更新失敗: ' + error.message)
+    }
   }
 
-  // --- 【功能升級：多圖上傳】 ---
+  // --- 【功能升級：多圖上傳 + 錯誤處理】 ---
   async function handleBatchUpload(id: string, files: FileList | null, currentPhotos: string[]) {
-    if (!files) return;
-    const uploadedUrls: string[] = [];
-    for (let i = 0; i < files.length; i++) {
+    if (!files || files.length === 0) return;
+    
+    setUploading(true);
+    console.log(`📸 開始上傳 ${files.length} 張照片...`);
+    
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const path = `uploads/${id}-${Date.now()}-${i}`;
-        await supabase.storage.from('honeymoon-photos').upload(path, file);
-        const { data: { publicUrl } } = supabase.storage.from('honeymoon-photos').getPublicUrl(path);
+        const timestamp = Date.now();
+        const path = `uploads/${id}-${timestamp}-${i}-${file.name}`;
+        
+        console.log(`⬆️ 上傳第 ${i + 1}/${files.length} 張: ${file.name}`);
+        
+        const { data, error: uploadError } = await supabase.storage
+          .from('honeymoon-photos')
+          .upload(path, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        if (uploadError) {
+          console.error(`❌ 上傳失敗 (${file.name}):`, uploadError);
+          throw uploadError;
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('honeymoon-photos')
+          .getPublicUrl(path);
+        
         uploadedUrls.push(publicUrl);
+        console.log(`✅ 上傳成功: ${publicUrl}`);
+      }
+      
+      const newPhotos = [...(currentPhotos || []), ...uploadedUrls];
+      console.log(`💾 更新數據庫，總共 ${newPhotos.length} 張照片`);
+      
+      const { error: updateError } = await supabase
+        .from('honeymoon_itinerary')
+        .update({ photo_urls: newPhotos })
+        .eq('id', id);
+      
+      if (updateError) {
+        console.error('❌ 數據庫更新錯誤:', updateError);
+        throw updateError;
+      }
+      
+      // 更新本地狀態
+      const updated = itinerary.map(item => 
+        item.id === id ? { ...item, photo_urls: newPhotos } : item
+      );
+      setItinerary(updated);
+      
+      console.log('🎉 上傳完成！');
+      alert(`✅ 成功上傳 ${uploadedUrls.length} 張照片！`);
+      
+    } catch (error: any) {
+      console.error('❌ 上傳過程出錯:', error);
+      alert('上傳失敗: ' + (error.message || '未知錯誤'));
+    } finally {
+      setUploading(false);
     }
-    const newPhotos = [...(currentPhotos || []), ...uploadedUrls];
-    await handleUpdate(id, 'photo_urls', newPhotos);
   }
 
   async function addJourney() {
@@ -117,9 +178,11 @@ export default function TravelBuddies() {
             width: 210mm; height: 297mm; 
             background-color: ${bgColor} !important; 
             -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
             page-break-after: always;
             padding: 20mm;
             display: flex; flex-direction: column;
+            box-sizing: border-box;
           }
         }
       `}</style>
@@ -140,8 +203,8 @@ export default function TravelBuddies() {
           <div className="w-full max-w-[550px] aspect-[1/1.41] bg-white/40 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white/60 flex flex-col overflow-hidden relative">
             
             {allPages[currentPage].type === 'cover' ? (
-              // 【封面：Full 版】
-              <div className="flex-1 relative flex flex-col items-center justify-center text-center p-0">
+              // 【封面：Full 版 - 全屏顯示，圓角覆蓋整個容器】
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center overflow-hidden rounded-[3rem]">
                  <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" />
                  <div className="absolute inset-0 bg-black/20" />
                  <div className="relative z-10 text-white drop-shadow-2xl px-10">
@@ -150,32 +213,68 @@ export default function TravelBuddies() {
                  </div>
               </div>
             ) : (
-              // 【行程內容頁】
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="p-10 pb-0 flex items-center gap-6">
-                  <span className="text-4xl font-serif italic text-stone-300">0{currentPage}</span>
-                  <div className="h-[0.5px] flex-1 bg-stone-200" />
+              // 【行程內容頁 - 優化排版】
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="p-8 pb-0 flex items-center gap-4 flex-shrink-0">
+                  <span className="text-3xl font-serif italic text-stone-400/80">0{currentPage}</span>
+                  <div className="h-[1px] flex-1 bg-stone-300/50" />
                 </div>
                 
-                {/* 內容捲動區：確保背景不動，內容動 */}
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-10 pt-6 space-y-10">
-                   <UniversalDesigner label="標題" html={(allPages[currentPage] as any).title} onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'title', v)} className="text-4xl md:text-6xl font-serif font-bold leading-tight" />
-                   <div className="bg-white/50 p-8 rounded-[2.5rem] shadow-inner border border-white/40 italic">
-                     <UniversalDesigner label="提醒" html={(allPages[currentPage] as any).guideline} onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'guideline', v)} className="text-lg text-stone-600" />
+                {/* 內容捲動區：只有這個區域可以滾動，背景固定 */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-8 pt-6 space-y-8 touch-pan-y">
+                   <UniversalDesigner 
+                     label="標題" 
+                     html={(allPages[currentPage] as any).title} 
+                     onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'title', v)} 
+                     className="text-3xl md:text-5xl font-serif font-bold leading-tight text-stone-800 mb-2" 
+                   />
+                   
+                   <div className="bg-white/60 p-6 rounded-[2rem] shadow-sm border border-stone-200/50">
+                     <UniversalDesigner 
+                       label="提醒" 
+                       html={(allPages[currentPage] as any).guideline} 
+                       onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'guideline', v)} 
+                       className="text-base text-stone-600 leading-relaxed" 
+                     />
                    </div>
-                   <div className="grid grid-cols-1 gap-6">
+                   
+                   <div className="grid grid-cols-1 gap-5">
                       {(allPages[currentPage] as any).photo_urls?.map((url: string, i: number) => (
-                        <img key={i} src={url} className="w-full rounded-[2.5rem] shadow-xl border-[10px] border-white" />
+                        <div key={i} className="relative">
+                          <img src={url} className="w-full rounded-[2rem] shadow-lg border-[8px] border-white object-cover" alt={`Photo ${i + 1}`} />
+                        </div>
                       ))}
                    </div>
-                   <UniversalDesigner label="日誌" html={(allPages[currentPage] as any).thoughts} className="text-xl md:text-2xl font-serif italic text-stone-500 pb-20" onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'thoughts', v)} />
+                   
+                   <div className="bg-stone-50/50 p-6 rounded-[2rem]">
+                     <UniversalDesigner 
+                       label="日誌" 
+                       html={(allPages[currentPage] as any).thoughts} 
+                       className="text-lg md:text-xl font-serif italic text-stone-600 leading-relaxed" 
+                       onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'thoughts', v)} 
+                     />
+                   </div>
+                   
+                   {/* 底部留白，確保內容不會被按鈕遮擋 */}
+                   <div className="h-24"></div>
                 </div>
 
-                {/* 底部功能區 */}
-                <div className="p-8 border-t border-white/20 bg-white/10 backdrop-blur-md flex gap-4 no-print">
-                   <label className="flex-1 text-center py-5 bg-stone-900 text-white rounded-full text-[10px] font-bold tracking-widest cursor-pointer shadow-xl">
-                      📷 MULTI UPLOAD
-                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleBatchUpload((allPages[currentPage] as any).id, e.target.files, (allPages[currentPage] as any).photo_urls)} />
+                {/* 底部功能區 - 固定在底部 */}
+                <div className="p-6 border-t border-white/20 bg-white/10 backdrop-blur-md flex gap-4 no-print flex-shrink-0">
+                   <label className={`flex-1 text-center py-4 rounded-full text-[10px] font-bold tracking-widest shadow-xl transition-colors ${
+                     uploading 
+                       ? 'bg-stone-400 text-white cursor-not-allowed' 
+                       : 'bg-stone-900 text-white cursor-pointer hover:bg-stone-800'
+                   }`}>
+                      {uploading ? '⏳ 上傳中...' : '📷 上傳照片'}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        className="hidden" 
+                        disabled={uploading}
+                        onChange={(e) => handleBatchUpload((allPages[currentPage] as any).id, e.target.files, (allPages[currentPage] as any).photo_urls)} 
+                      />
                    </label>
                 </div>
               </div>
@@ -190,21 +289,28 @@ export default function TravelBuddies() {
         {allPages.map((page, idx) => (
           <div key={idx} className="print-page">
             {page.type === 'cover' ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center">
-                 <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="w-80 h-80 object-cover rounded-full border-[20px] border-white" />
-                 <h1 className="text-7xl font-serif font-bold mt-12">我們的台灣三人蜜月</h1>
+              <div className="flex-1 flex flex-col items-center justify-center text-center relative">
+                 <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" style={{margin: '-20mm', width: '210mm', height: '297mm'}} />
+                 <div className="absolute inset-0 bg-black/20" style={{margin: '-20mm', width: '210mm', height: '297mm'}} />
+                 <div className="relative z-10 text-white drop-shadow-2xl">
+                   <h1 className="text-7xl font-serif font-bold tracking-tighter leading-none mb-6">我們的台灣<br/>三人蜜月</h1>
+                   <div className="h-1 w-20 bg-white/80 mx-auto" />
+                 </div>
               </div>
             ) : (
-              <div className="space-y-10">
-                <div className="text-8xl font-serif italic text-white/50">0{idx}</div>
-                <div className="text-6xl font-serif font-bold" dangerouslySetInnerHTML={{ __html: (page as any).title }} />
-                <div className="bg-white/40 p-10 rounded-[3rem] text-2xl italic" dangerouslySetInnerHTML={{ __html: (page as any).guideline }} />
-                <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="text-5xl font-serif italic text-stone-400/80">0{idx}</div>
+                  <div className="h-[1px] flex-1 bg-stone-300/50" />
+                </div>
+                <div className="text-4xl font-serif font-bold leading-tight mb-6" dangerouslySetInnerHTML={{ __html: (page as any).title }} />
+                <div className="bg-white/40 p-8 rounded-[2rem] text-xl leading-relaxed mb-6" dangerouslySetInnerHTML={{ __html: (page as any).guideline }} />
+                <div className="grid grid-cols-1 gap-5">
                   {(page as any).photo_urls?.map((url: string, i: number) => (
-                    <img key={i} src={url} className="w-full rounded-[3rem] border-[15px] border-white" />
+                    <img key={i} src={url} className="w-full rounded-[2rem] border-[8px] border-white object-cover" style={{maxHeight: '400px'}} />
                   ))}
                 </div>
-                <div className="text-3xl font-serif italic text-stone-600" dangerouslySetInnerHTML={{ __html: (page as any).thoughts }} />
+                <div className="text-2xl font-serif italic text-stone-600 leading-relaxed mt-6" dangerouslySetInnerHTML={{ __html: (page as any).thoughts }} />
               </div>
             )}
           </div>
