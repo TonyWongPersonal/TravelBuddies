@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { motion } from 'framer-motion' // 引入動畫庫
 
 // --- 資料型別 ---
 interface ItineraryItem {
@@ -142,7 +143,7 @@ export default function TravelBuddies() {
   return (
     <div style={{ backgroundColor: bgColor }} className="min-h-screen text-stone-800 font-sans relative transition-colors duration-700">
       
-      {/* --- 修正：強制打印背景色與頁碼 --- */}
+      {/* --- 全局樣式 --- */}
       <style jsx global>{`
         @page { size: auto; margin: 0; }
         @media print {
@@ -174,20 +175,37 @@ export default function TravelBuddies() {
         }
       `}</style>
 
-      {/* 1. 封面區 */}
+      {/* 1. 封面區 - 增加呼吸動畫 */}
       <section className="h-screen w-full relative flex items-center justify-center overflow-hidden cover-page">
         <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" alt="Cover" />
-        <div className="absolute left-6 md:left-10 top-[40%] flex flex-col items-center gap-6 no-print">
+        <motion.div 
+          initial={{ opacity: 0.6, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
+          }}
+          className="absolute left-6 md:left-10 top-[40%] flex flex-col items-center gap-6 no-print"
+        >
           <div className="h-12 md:h-20 w-[0.5px] bg-stone-400/30"></div>
           <h1 className="[writing-mode:vertical-lr] text-[10px] md:text-xs font-serif font-bold tracking-[0.5em] text-stone-800/60 rotate-180 uppercase">TRAVEL BUDDIES</h1>
           <div className="h-12 md:h-20 w-[0.5px] bg-stone-400/30"></div>
-        </div>
+        </motion.div>
       </section>
 
-      {/* 2. 行程清單 - 優化響應式字級 */}
+      {/* 2. 行程清單 - 增加滑動浮現動畫 */}
       <main className="w-full max-w-7xl mx-auto py-16 md:py-48 px-5 md:px-10 space-y-24 md:space-y-64 relative">
         {itinerary.map((item, index) => (
-          <section key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-24 items-start page-break">
+          <motion.section 
+            key={item.id} 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            viewport={{ once: true, amount: 0.1 }}
+            className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-24 items-start page-break"
+          >
             
             <div className="md:col-span-5 md:sticky md:top-24 space-y-6 md:space-y-12">
               <div className="flex items-center gap-6">
@@ -195,7 +213,6 @@ export default function TravelBuddies() {
                 <div className="h-[0.5px] flex-1 bg-stone-200/50"></div>
               </div>
 
-              {/* 修正：手機端標題字級由 text-4xl 降為 text-3xl */}
               <UniversalDesigner 
                 label="標題" html={item.title} 
                 onSave={(v) => handleUpdate(item.id, 'title', v)}
@@ -222,9 +239,13 @@ export default function TravelBuddies() {
               <div className="grid grid-cols-1 gap-8 md:gap-14">
                 {item.photo_urls?.length > 0 ? (
                   item.photo_urls.map((url, i) => (
-                    <div key={i} className="rounded-[2rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border-[8px] md:border-[16px] border-white/80 p-0.5 bg-white/40">
+                    <motion.div 
+                      key={i} 
+                      whileHover={{ scale: 1.02 }}
+                      className="rounded-[2rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border-[8px] md:border-[16px] border-white/80 p-0.5 bg-white/40"
+                    >
                        <img src={url} className="w-full object-cover" />
-                    </div>
+                    </motion.div>
                   ))
                 ) : (
                   <div className="aspect-[4/3] bg-white/20 rounded-[2.5rem] md:rounded-[4rem] border border-dashed border-stone-300 flex items-center justify-center text-stone-300 italic font-serif text-sm">Waiting for memory...</div>
@@ -235,14 +256,18 @@ export default function TravelBuddies() {
                 <UniversalDesigner label="日誌" html={item.thoughts} onSave={(v) => handleUpdate(item.id, 'thoughts', v)} className="min-h-[100px] text-lg md:text-2xl font-serif italic text-stone-500 leading-relaxed text-center md:text-left" />
               </div>
             </div>
-          </section>
+          </motion.section>
         ))}
       </main>
 
-      {/* 3. 懸浮工具 - 手機端位置優化 */}
+      {/* 3. 懸浮工具 */}
       <div className="fixed bottom-6 left-6 md:bottom-12 md:left-12 flex flex-col gap-4 no-print z-[300]">
         {showUI && (
-          <div className="bg-white/95 backdrop-blur-md p-5 rounded-[2rem] shadow-2xl border border-stone-200 mb-2 animate-in slide-in-from-bottom-5">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/95 backdrop-blur-md p-5 rounded-[2rem] shadow-2xl border border-stone-200 mb-2"
+          >
              <div className="flex flex-col gap-3">
                <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">BG Color</span>
                <div className="flex items-center gap-2">
@@ -250,7 +275,7 @@ export default function TravelBuddies() {
                  <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-6 h-6 cursor-pointer" />
                </div>
              </div>
-          </div>
+          </motion.div>
         )}
         <button onClick={() => setShowUI(!showUI)} className="w-14 h-14 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-[10px] font-bold active:bg-stone-50 transition-colors">UI</button>
         <button onClick={addJourney} className="w-14 h-14 bg-white border border-stone-200 rounded-full shadow-2xl flex items-center justify-center text-2xl active:scale-90 transition-all">＋</button>
