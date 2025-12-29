@@ -252,6 +252,27 @@ export default function TravelBuddies() {
     }
   }
 
+  async function deleteJourney(id: string) {
+    if (!confirm('確定要刪除這個行程嗎？')) return;
+    
+    const { error } = await supabase.from('honeymoon_itinerary').delete().eq('id', id)
+    if (error) {
+      console.error('❌ 刪除失敗:', error)
+      alert('刪除失敗: ' + error.message)
+      return
+    }
+    
+    const updated = itinerary.filter(item => item.id !== id)
+    setItinerary(updated)
+    
+    // 如果刪除的是當前頁，跳到前一頁
+    if (currentPage > 0 && currentPage >= updated.length + 1) {
+      setCurrentPage(currentPage - 1)
+    }
+    
+    alert('✅ 刪除成功！')
+  }
+
   // --- 【導出為 Canva 素材包】3x 高清圖片 + JSON 數據 + ZIP 打包 ---
   async function exportToCanva() {
     if (exporting) return;
@@ -962,7 +983,15 @@ export default function TravelBuddies() {
 
       {/* 底部工具 */}
       <div className="fixed bottom-8 right-8 flex items-center gap-5 no-print z-[300]">
-        <button onClick={addJourney} className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-3xl">+</button>
+        <button onClick={addJourney} className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-3xl hover:bg-stone-50 transition-colors">+</button>
+        {allPages[currentPage].type !== 'cover' && (
+          <button 
+            onClick={() => deleteJourney((allPages[currentPage] as any).id)} 
+            className="w-14 h-14 bg-red-500 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl hover:bg-red-600 transition-colors"
+          >
+            🗑️
+          </button>
+        )}
         <div className="bg-white/90 backdrop-blur-md rounded-full px-6 py-4 shadow-2xl flex items-center gap-4">
            <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" />
            <button 
