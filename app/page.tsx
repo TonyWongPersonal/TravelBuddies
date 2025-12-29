@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toPng } from 'html-to-image'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
+import PptxGenJS from 'pptxgenjs'
 
 // --- 資料型別 ---
 interface ItineraryItem {
@@ -481,6 +482,266 @@ export default function TravelBuddies() {
     }
   }
 
+  // --- 【導出為 PowerPoint】可編輯的文字和圖片 ---
+  async function exportToPowerPoint() {
+    if (exporting) return;
+    
+    setExporting(true);
+    setExportProgress('正在生成 PowerPoint...');
+    console.log('📊 開始導出 PowerPoint...');
+    
+    try {
+      const pptx = new PptxGenJS();
+      
+      // 設置幻燈片尺寸（16:9）
+      pptx.layout = 'LAYOUT_16x9';
+      pptx.author = 'Travel Buddies';
+      pptx.title = '旅行日記';
+      pptx.subject = '蜜月旅行回憶';
+      
+      // 輔助函數：清理 HTML 標籤並保留文本
+      const stripHtml = (html: string) => {
+        if (!html) return '';
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return doc.body.textContent || '';
+      };
+      
+      // 輔助函數：將 URL 轉換為 base64
+      const imageToBase64 = async (url: string): Promise<string> => {
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('圖片轉換失敗:', url, error);
+          return '';
+        }
+      };
+      
+      // 遍歷所有頁面
+      for (let idx = 0; idx < allPages.length; idx++) {
+        const page = allPages[idx];
+        setExportProgress(`正在處理第 ${idx + 1}/${allPages.length} 頁...`);
+        console.log(`📄 處理第 ${idx + 1}/${allPages.length} 頁`);
+        
+        const slide = pptx.addSlide();
+        
+        // 設置背景顏色
+        slide.background = { color: bgColor.replace('#', '') };
+        
+        if (page.type === 'cover') {
+          // 封面頁 - 添加封面圖片
+          try {
+            const coverImageBase64 = await imageToBase64('https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png');
+            if (coverImageBase64) {
+              slide.addImage({
+                data: coverImageBase64,
+                x: 0,
+                y: 0,
+                w: '100%',
+                h: '100%'
+              });
+            }
+          } catch (error) {
+            console.error('封面圖片加載失敗:', error);
+          }
+        } else {
+          // 內容頁
+          const item = page as any;
+          const template = item.template || 'classic';
+          
+          if (template === 'minimal') {
+            // 極簡模板布局
+            // 日期標籤（左上角）
+            slide.addText(`Day ${idx} | ${stripHtml(item.date)}`, {
+              x: 0.5,
+              y: 0.5,
+              fontSize: 10,
+              color: '78716C',
+              bold: true
+            });
+            
+            // 標題（居中）
+            slide.addText(stripHtml(item.title), {
+              x: 1,
+              y: 1.5,
+              w: 8,
+              h: 1,
+              fontSize: 44,
+              bold: true,
+              color: '1C1917',
+              align: 'center',
+              fontFace: 'Georgia'
+            });
+            
+            // 副標題（居中）
+            if (item.guideline) {
+              slide.addText(stripHtml(item.guideline), {
+                x: 2,
+                y: 2.7,
+                w: 6,
+                h: 0.8,
+                fontSize: 16,
+                color: '57534E',
+                align: 'center'
+              });
+            }
+            
+            // 照片區域 - 智能布局
+            const photos = item.photo_urls || [];
+            const photoCount = photos.length;
+            
+            if (photoCount > 0) {
+              setExportProgress(`正在下載第 ${idx + 1} 頁的照片...`);
+              
+              if (photoCount === 1) {
+                // 1張：居中大圖
+                const imgData = await imageToBase64(photos[0]);
+                if (imgData) {
+                  slide.addImage({ data: imgData, x: 2.5, y: 3.5, w: 5, h: 3 });
+                }
+              } else if (photoCount === 2) {
+                // 2張：左右並排
+                for (let i = 0; i < 2; i++) {
+                  const imgData = await imageToBase64(photos[i]);
+                  if (imgData) {
+                    slide.addImage({ data: imgData, x: 1 + i * 4.5, y: 3.5, w: 4, h: 2.5 });
+                  }
+                }
+              } else if (photoCount === 3) {
+                // 3張：1大2小
+                const img1 = await imageToBase64(photos[0]);
+                if (img1) slide.addImage({ data: img1, x: 1, y: 3.5, w: 8, h: 3 });
+                
+                for (let i = 1; i < 3; i++) {
+                  const imgData = await imageToBase64(photos[i]);
+                  if (imgData) {
+                    slide.addImage({ data: imgData, x: 1 + (i - 1) * 4.2, y: 6.7, w: 3.8, h: 1.5 });
+                  }
+                }
+              } else {
+                // 4張：2x2網格
+                for (let i = 0; i < Math.min(4, photoCount); i++) {
+                  const imgData = await imageToBase64(photos[i]);
+                  if (imgData) {
+                    const row = Math.floor(i / 2);
+                    const col = i % 2;
+                    slide.addImage({ data: imgData, x: 1 + col * 4.5, y: 3.5 + row * 2.2, w: 4, h: 2 });
+                  }
+                }
+              }
+            }
+            
+            // 日誌描述（底部居中）
+            if (item.thoughts) {
+              slide.addText(stripHtml(item.thoughts), {
+                x: 2,
+                y: photoCount > 0 ? 4.8 : 4,
+                w: 6,
+                h: 1,
+                fontSize: 18,
+                color: '57534E',
+                align: 'center',
+                italic: true,
+                fontFace: 'Georgia'
+              });
+            }
+          } else {
+            // 經典模板布局
+            // 頁碼（左上）
+            slide.addText(`0${idx}`, {
+              x: 0.5,
+              y: 0.5,
+              fontSize: 32,
+              color: '78716C80',
+              italic: true,
+              fontFace: 'Georgia'
+            });
+            
+            // 標題
+            slide.addText(stripHtml(item.title), {
+              x: 0.5,
+              y: 1.2,
+              w: 9,
+              h: 1,
+              fontSize: 36,
+              bold: true,
+              color: '1C1917',
+              fontFace: 'Georgia'
+            });
+            
+            // 提醒框
+            if (item.guideline) {
+              slide.addText(stripHtml(item.guideline), {
+                x: 0.5,
+                y: 2.3,
+                w: 9,
+                h: 1,
+                fontSize: 14,
+                color: '57534E',
+                fill: { color: 'FFFFFF99' }
+              });
+            }
+            
+            // 照片
+            const photos = item.photo_urls || [];
+            if (photos.length > 0) {
+              setExportProgress(`正在下載第 ${idx + 1} 頁的照片...`);
+              const maxPhotos = Math.min(2, photos.length);
+              
+              for (let i = 0; i < maxPhotos; i++) {
+                const imgData = await imageToBase64(photos[i]);
+                if (imgData) {
+                  slide.addImage({
+                    data: imgData,
+                    x: 0.5,
+                    y: 3.5 + i * 2.2,
+                    w: 9,
+                    h: 2
+                  });
+                }
+              }
+            }
+            
+            // 日誌
+            if (item.thoughts) {
+              slide.addText(stripHtml(item.thoughts), {
+                x: 0.5,
+                y: 3.5 + (photos.length > 0 ? 2.3 * Math.min(2, photos.length) : 0),
+                w: 9,
+                h: 1.2,
+                fontSize: 16,
+                color: '57534E',
+                italic: true,
+                fontFace: 'Georgia'
+              });
+            }
+          }
+        }
+      }
+      
+      // 生成並下載
+      setExportProgress('正在生成文件...');
+      const filename = `travel-buddies-${new Date().toISOString().split('T')[0]}.pptx`;
+      await pptx.writeFile({ fileName: filename });
+      
+      console.log('🎉 PowerPoint 導出完成！');
+      alert(`✅ PowerPoint 導出成功！\n\n文件名：${filename}\n\n💡 使用方法：\n1. 上傳到 Google Drive\n2. 右鍵 → "打開方式" → "Google 幻燈片"\n3. 即可在線編輯！`);
+      
+    } catch (error: any) {
+      console.error('❌ PowerPoint 導出失敗:', error);
+      alert(`PowerPoint 導出失敗：${error.message || '未知錯誤'}`);
+    } finally {
+      setExporting(false);
+      setExportProgress('');
+    }
+  }
+
   const allPages = [{ type: 'cover' }, ...itinerary.map(item => ({ type: 'itinerary', ...item }))];
   const nextPage = () => currentPage < allPages.length - 1 && setCurrentPage(currentPage + 1)
   const prevPage = () => currentPage > 0 && setCurrentPage(currentPage - 1)
@@ -705,13 +966,13 @@ export default function TravelBuddies() {
         <div className="bg-white/90 backdrop-blur-md rounded-full px-6 py-4 shadow-2xl flex items-center gap-4">
            <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" />
            <button 
-             onClick={exportToCanva}
+             onClick={exportToPowerPoint}
              disabled={exporting}
              className={`text-[10px] font-black tracking-widest uppercase ${
                exporting ? 'text-stone-400 cursor-not-allowed' : 'text-stone-900 hover:text-stone-600'
              }`}
            >
-             📦 導出素材
+             📊 導出 PPT
            </button>
            <div className="w-[1px] h-6 bg-stone-300" />
            <button onClick={() => window.print()} className="text-[10px] font-black tracking-widest uppercase">一鍵成書 (PDF)</button>
