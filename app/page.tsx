@@ -2,6 +2,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toPng } from 'html-to-image'
+import JSZip from 'jszip'
+import { saveAs } from 'file-saver'
 
 // --- 資料型別 ---
 interface ItineraryItem {
@@ -55,6 +58,8 @@ export default function TravelBuddies() {
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState('')
   const [bgColor, setBgColor] = useState('#ffd9b6')
   const [currentPage, setCurrentPage] = useState(0)
 
@@ -155,6 +160,236 @@ export default function TravelBuddies() {
     if (data) {
         setItinerary([...itinerary, data[0]])
         setCurrentPage(itinerary.length + 1)
+    }
+  }
+
+  // --- 【導出為 Canva 素材包】3x 高清圖片 + JSON 數據 + ZIP 打包 ---
+  async function exportToCanva() {
+    if (exporting) return;
+    
+    setExporting(true);
+    setExportProgress('準備導出...');
+    console.log('📦 開始導出 Canva 素材包...');
+    
+    try {
+      const zip = new JSZip();
+      const imagesFolder = zip.folder('images');
+      
+      if (!imagesFolder) {
+        throw new Error('無法創建圖片文件夾');
+      }
+      
+      // 準備導出數據
+      const exportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        backgroundColor: bgColor,
+        pages: [] as any[]
+      };
+      
+      // 創建臨時渲染容器
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '-10000px';
+      container.style.left = '-10000px';
+      container.style.width = '550px';
+      container.style.aspectRatio = '1/1.41';
+      document.body.appendChild(container);
+      
+      // 遍歷所有頁面並渲染為圖片
+      for (let idx = 0; idx < allPages.length; idx++) {
+        const page = allPages[idx];
+        const pageNum = idx.toString().padStart(2, '0');
+        
+        setExportProgress(`正在渲染第 ${idx + 1}/${allPages.length} 頁...`);
+        console.log(`🎨 渲染第 ${idx + 1}/${allPages.length} 頁: ${page.type}`);
+        
+        // 創建頁面元素
+        container.innerHTML = '';
+        const pageElement = document.createElement('div');
+        pageElement.style.width = '100%';
+        pageElement.style.height = '100%';
+        pageElement.style.backgroundColor = bgColor;
+        pageElement.style.borderRadius = '3rem';
+        pageElement.style.overflow = 'hidden';
+        pageElement.style.position = 'relative';
+        
+        if (page.type === 'cover') {
+          // 封面頁
+          pageElement.innerHTML = `
+            <div style="position: absolute; inset: 0; overflow: hidden; border-radius: 3rem;">
+              <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" 
+                   style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;"
+                   crossorigin="anonymous" />
+            </div>
+          `;
+          
+          exportData.pages.push({
+            pageNumber: idx,
+            type: 'cover',
+            imageFile: `images/cover.png`
+          });
+        } else {
+          // 行程內容頁
+          const item = page as any;
+          pageElement.innerHTML = `
+            <div style="padding: 3rem; height: 100%; display: flex; flex-direction: column; gap: 2rem; overflow: hidden;">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 2rem; font-family: serif; font-style: italic; color: rgba(120, 113, 108, 0.8);">0${idx}</span>
+                <div style="height: 1px; flex: 1; background: rgba(214, 211, 209, 0.5);"></div>
+              </div>
+              
+              <div style="font-size: 2.5rem; font-family: serif; font-weight: bold; line-height: 1.2; color: #1c1917;">
+                ${item.title || ''}
+              </div>
+              
+              <div style="background: rgba(255, 255, 255, 0.6); padding: 1.5rem; border-radius: 2rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid rgba(231, 229, 228, 0.5);">
+                <div style="font-size: 1rem; color: #57534e; line-height: 1.6;">
+                  ${item.guideline || ''}
+                </div>
+              </div>
+              
+              ${item.photo_urls && item.photo_urls.length > 0 ? `
+                <div style="display: grid; grid-template-columns: 1fr; gap: 1.25rem;">
+                  ${item.photo_urls.slice(0, 2).map((url: string) => `
+                    <img src="${url}" 
+                         style="width: 100%; border-radius: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 8px solid white; object-fit: cover; max-height: 300px;"
+                         crossorigin="anonymous" />
+                  `).join('')}
+                </div>
+              ` : ''}
+              
+              <div style="background: rgba(250, 250, 249, 0.5); padding: 1.5rem; border-radius: 2rem;">
+                <div style="font-size: 1.25rem; font-family: serif; font-style: italic; color: #57534e; line-height: 1.6;">
+                  ${item.thoughts || ''}
+                </div>
+              </div>
+            </div>
+          `;
+          
+          exportData.pages.push({
+            pageNumber: idx,
+            type: 'itinerary',
+            imageFile: `images/page-${pageNum}.png`,
+            data: {
+              id: item.id,
+              dayNumber: item.day_number,
+              date: item.date,
+              title: item.title,
+              guideline: item.guideline,
+              thoughts: item.thoughts,
+              photoUrls: item.photo_urls,
+              googleMapsUrl: item.google_maps_url
+            }
+          });
+        }
+        
+        container.appendChild(pageElement);
+        
+        // 等待圖片加載
+        const images = pageElement.querySelectorAll('img');
+        await Promise.all(
+          Array.from(images).map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              // 設置超時
+              setTimeout(() => resolve(null), 5000);
+            });
+          })
+        );
+        
+        // 短暫延遲確保渲染完成
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 將頁面轉換為高清圖片（3x 分辨率）
+        try {
+          const dataUrl = await toPng(pageElement, {
+            pixelRatio: 3,
+            quality: 1.0,
+            backgroundColor: bgColor,
+            cacheBust: true
+          });
+          
+          // 將 base64 轉換為 binary
+          const base64Data = dataUrl.split(',')[1];
+          const binaryData = atob(base64Data);
+          const arrayBuffer = new Uint8Array(binaryData.length);
+          for (let i = 0; i < binaryData.length; i++) {
+            arrayBuffer[i] = binaryData.charCodeAt(i);
+          }
+          
+          // 添加到 ZIP
+          const filename = page.type === 'cover' ? 'cover.png' : `page-${pageNum}.png`;
+          imagesFolder.file(filename, arrayBuffer, { binary: true });
+          
+          console.log(`✅ 第 ${idx + 1} 頁渲染完成: ${filename}`);
+        } catch (err) {
+          console.error(`❌ 渲染第 ${idx + 1} 頁失敗:`, err);
+          throw err;
+        }
+      }
+      
+      // 清理臨時容器
+      document.body.removeChild(container);
+      
+      setExportProgress('正在打包文件...');
+      
+      // 添加 JSON 數據文件
+      zip.file('data.json', JSON.stringify(exportData, null, 2));
+      
+      // 添加 manifest 元數據
+      const manifest = {
+        name: 'Travel Buddies Export',
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        totalPages: allPages.length,
+        backgroundColor: bgColor
+      };
+      zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+      
+      // 添加使用說明
+      const readme = `Travel Buddies - Canva 素材包
+
+📦 內容說明：
+- images/ 文件夾包含所有頁面的高清圖片（3x 分辨率）
+- data.json 包含完整的行程數據和富文本內容
+- manifest.json 包含導出元數據
+
+🎨 如何在 Canva 中使用：
+1. 將 images 文件夾中的圖片直接拖入 Canva
+2. 使用 data.json 中的文本內容進行編輯
+3. 圖片已經是高清格式，可以直接使用
+
+導出時間：${new Date().toLocaleString('zh-CN')}
+背景顏色：${bgColor}
+總頁數：${allPages.length}
+`;
+      zip.file('README.txt', readme);
+      
+      // 生成 ZIP 文件並下載
+      setExportProgress('正在生成 ZIP 文件...');
+      console.log('🗜️ 生成 ZIP 文件...');
+      
+      const blob = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 9 }
+      });
+      
+      const filename = `travel-buddies-${new Date().toISOString().split('T')[0]}.zip`;
+      saveAs(blob, filename);
+      
+      console.log('🎉 導出完成！');
+      alert(`✅ 導出成功！\n\n文件名：${filename}\n包含：${allPages.length} 頁高清圖片 + JSON 數據`);
+      
+    } catch (error: any) {
+      console.error('❌ 導出失敗:', error);
+      alert(`導出失敗：${error.message || '未知錯誤'}`);
+    } finally {
+      setExporting(false);
+      setExportProgress('');
     }
   }
 
@@ -332,11 +567,37 @@ export default function TravelBuddies() {
         ))}
       </div>
 
+      {/* 導出進度提示 */}
+      {exporting && (
+        <div className="fixed inset-0 z-[700] bg-stone-900/80 backdrop-blur-lg flex items-center justify-center no-print">
+          <div className="bg-white rounded-[3rem] p-12 shadow-2xl max-w-md w-full mx-4 text-center">
+            <div className="text-6xl mb-6">📦</div>
+            <div className="text-2xl font-bold text-stone-800 mb-4">正在導出素材包</div>
+            <div className="text-lg text-stone-600 mb-8">{exportProgress}</div>
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 底部工具 */}
       <div className="fixed bottom-8 right-8 flex items-center gap-5 no-print z-[300]">
         <button onClick={addJourney} className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-3xl">+</button>
         <div className="bg-white/90 backdrop-blur-md rounded-full px-6 py-4 shadow-2xl flex items-center gap-4">
            <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" />
+           <button 
+             onClick={exportToCanva}
+             disabled={exporting}
+             className={`text-[10px] font-black tracking-widest uppercase ${
+               exporting ? 'text-stone-400 cursor-not-allowed' : 'text-stone-900 hover:text-stone-600'
+             }`}
+           >
+             📦 導出素材
+           </button>
+           <div className="w-[1px] h-6 bg-stone-300" />
            <button onClick={() => window.print()} className="text-[10px] font-black tracking-widest uppercase">一鍵成書 (PDF)</button>
         </div>
       </div>
