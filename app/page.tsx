@@ -10,6 +10,20 @@ import { saveAs } from 'file-saver'
 interface ItineraryItem {
   id: string; day_number: number; date: string; time_slot: string; title: string;
   guideline: string; photo_urls: string[]; thoughts: string; google_maps_url: string;
+  template?: string; // 模板類型：'classic' 或 'minimal'
+}
+
+// --- 【照片智能布局助手】根據照片數量返回布局方式 ---
+function getPhotoLayout(photoCount: number): {
+  gridCols: string;
+  maxPhotos: number;
+  layout: 'single' | 'dual' | 'one-large-two-small' | 'grid-2x2';
+} {
+  if (photoCount === 0) return { gridCols: 'grid-cols-1', maxPhotos: 0, layout: 'single' };
+  if (photoCount === 1) return { gridCols: 'grid-cols-1', maxPhotos: 1, layout: 'single' };
+  if (photoCount === 2) return { gridCols: 'grid-cols-2', maxPhotos: 2, layout: 'dual' };
+  if (photoCount === 3) return { gridCols: 'grid-cols-2', maxPhotos: 3, layout: 'one-large-two-small' };
+  return { gridCols: 'grid-cols-2', maxPhotos: 4, layout: 'grid-2x2' };
 }
 
 // --- 【1. 完整設計器】功能全開：字級、顏色、排版 ---
@@ -52,6 +66,80 @@ function UniversalDesigner({ html, onSave, label = "", className = "" }: { html:
     )
   }
   return <div onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-white/40 transition-all rounded-2xl p-2 -m-2 ${className}`} dangerouslySetInnerHTML={{ __html: html || `<span class="text-stone-300 italic">Edit ${label}</span>` }} />
+}
+
+// --- 【2. 極簡模板渲染器】根據照片數量智能排版 ---
+function MinimalTemplate({ item, pageNum, onUpdate }: { item: ItineraryItem, pageNum: number, onUpdate: (field: keyof ItineraryItem, value: any) => void }) {
+  const photoCount = item.photo_urls?.length || 0
+  const layout = getPhotoLayout(photoCount)
+  const photos = item.photo_urls?.slice(0, layout.maxPhotos) || []
+  
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white/20">
+      {/* 極簡頁面標籤 */}
+      <div className="p-6 flex-shrink-0">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">
+          Day {pageNum} | <UniversalDesigner html={item.date} onSave={(v) => onUpdate('date', v)} className="inline" />
+        </div>
+      </div>
+      
+      {/* 內容區 - 極簡排版 */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-8 pb-8 space-y-12 touch-pan-y">
+        {/* 大標題區 */}
+        <div className="text-center space-y-4">
+          <UniversalDesigner 
+            label="標題" 
+            html={item.title} 
+            onSave={(v) => onUpdate('title', v)} 
+            className="text-4xl md:text-6xl font-serif font-bold leading-tight text-stone-900" 
+          />
+          <UniversalDesigner 
+            label="副標題" 
+            html={item.guideline} 
+            onSave={(v) => onUpdate('guideline', v)} 
+            className="text-lg text-stone-600 leading-relaxed max-w-md mx-auto" 
+          />
+        </div>
+        
+        {/* 照片區 - 智能布局 */}
+        {photoCount > 0 && (
+          <div className={`grid ${layout.gridCols} gap-4`}>
+            {layout.layout === 'one-large-two-small' ? (
+              <>
+                <div className="col-span-2">
+                  <img src={photos[0]} className="w-full h-96 object-cover rounded-2xl shadow-lg" alt="Photo 1" />
+                </div>
+                {photos[1] && <img src={photos[1]} className="w-full h-48 object-cover rounded-2xl shadow-lg" alt="Photo 2" />}
+                {photos[2] && <img src={photos[2]} className="w-full h-48 object-cover rounded-2xl shadow-lg" alt="Photo 3" />}
+              </>
+            ) : (
+              photos.map((url, i) => (
+                <img 
+                  key={i} 
+                  src={url} 
+                  className={`w-full ${layout.layout === 'single' ? 'h-96' : 'h-64'} object-cover rounded-2xl shadow-lg`} 
+                  alt={`Photo ${i + 1}`} 
+                />
+              ))
+            )}
+          </div>
+        )}
+        
+        {/* 文字描述區 */}
+        <div className="text-center max-w-lg mx-auto">
+          <UniversalDesigner 
+            label="日誌" 
+            html={item.thoughts} 
+            className="text-xl font-serif italic text-stone-700 leading-relaxed" 
+            onSave={(v) => onUpdate('thoughts', v)} 
+          />
+        </div>
+        
+        {/* 底部留白 */}
+        <div className="h-24"></div>
+      </div>
+    </div>
+  )
 }
 
 export default function TravelBuddies() {
@@ -442,6 +530,25 @@ export default function TravelBuddies() {
         }
       `}</style>
 
+      {/* 模板切換按鈕 - 僅非封面頁顯示 */}
+      {allPages[currentPage].type !== 'cover' && (
+        <div className="fixed top-8 right-8 z-[300] no-print">
+          <button
+            onClick={() => {
+              const currentTemplate = (allPages[currentPage] as any).template || 'classic';
+              const newTemplate = currentTemplate === 'classic' ? 'minimal' : 'classic';
+              handleUpdate((allPages[currentPage] as any).id, 'template', newTemplate);
+            }}
+            className="bg-white/90 backdrop-blur-md rounded-full px-6 py-3 shadow-2xl flex items-center gap-2 hover:bg-white transition-colors"
+          >
+            <span className="text-2xl">{(allPages[currentPage] as any).template === 'minimal' ? '📖' : '✨'}</span>
+            <span className="text-[10px] font-black tracking-widest uppercase">
+              {(allPages[currentPage] as any).template === 'minimal' ? '經典' : '極簡'}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* 翻頁區域 */}
       <div className="absolute inset-y-0 left-0 w-24 z-50 cursor-pointer no-print" onClick={prevPage} />
       <div className="absolute inset-y-0 right-0 w-24 z-50 cursor-pointer no-print" onClick={nextPage} />
@@ -463,7 +570,15 @@ export default function TravelBuddies() {
                  <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" />
               </div>
             ) : (
-              // 【行程內容頁 - 優化排版】
+              // 【行程內容頁 - 根據模板類型渲染】
+              (allPages[currentPage] as any).template === 'minimal' ? (
+                <MinimalTemplate 
+                  item={allPages[currentPage] as any} 
+                  pageNum={currentPage}
+                  onUpdate={(field, value) => handleUpdate((allPages[currentPage] as any).id, field, value)}
+                />
+              ) : (
+              // 【經典模板 - 原有排版】
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="p-8 pb-0 flex items-center gap-4 flex-shrink-0">
                   <span className="text-3xl font-serif italic text-stone-400/80">0{currentPage}</span>
@@ -528,6 +643,7 @@ export default function TravelBuddies() {
                    </label>
                 </div>
               </div>
+              )
             )}
             <div className="absolute bottom-6 left-0 right-0 text-center font-serif text-[10px] text-stone-300 no-print">PAGE {currentPage + 1} / {allPages.length}</div>
           </div>
