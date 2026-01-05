@@ -74,7 +74,7 @@ function MinimalTemplate({ item, pageNum, onUpdate }: { item: ItineraryItem, pag
   const photoCount = item.photo_urls?.length || 0
   const layout = getPhotoLayout(photoCount)
   const photos = item.photo_urls?.slice(0, layout.maxPhotos) || []
-  
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white/20">
       {/* 極簡頁面標籤 */}
@@ -83,25 +83,25 @@ function MinimalTemplate({ item, pageNum, onUpdate }: { item: ItineraryItem, pag
           Day {pageNum} | <UniversalDesigner html={item.date} onSave={(v) => onUpdate('date', v)} className="inline" />
         </div>
       </div>
-      
+
       {/* 內容區 - 極簡排版 */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-8 pb-8 space-y-12 touch-pan-y">
         {/* 大標題區 */}
         <div className="text-center space-y-4">
-          <UniversalDesigner 
-            label="標題" 
-            html={item.title} 
-            onSave={(v) => onUpdate('title', v)} 
-            className="text-4xl md:text-6xl font-serif font-bold leading-tight text-stone-900" 
+          <UniversalDesigner
+            label="標題"
+            html={item.title}
+            onSave={(v) => onUpdate('title', v)}
+            className="text-4xl md:text-6xl font-serif font-bold leading-tight text-stone-900"
           />
-          <UniversalDesigner 
-            label="副標題" 
-            html={item.guideline} 
-            onSave={(v) => onUpdate('guideline', v)} 
-            className="text-lg text-stone-600 leading-relaxed max-w-md mx-auto" 
+          <UniversalDesigner
+            label="副標題"
+            html={item.guideline}
+            onSave={(v) => onUpdate('guideline', v)}
+            className="text-lg text-stone-600 leading-relaxed max-w-md mx-auto"
           />
         </div>
-        
+
         {/* 照片區 - 智能布局 */}
         {photoCount > 0 && (
           <div className={`grid ${layout.gridCols} gap-4`}>
@@ -115,27 +115,27 @@ function MinimalTemplate({ item, pageNum, onUpdate }: { item: ItineraryItem, pag
               </>
             ) : (
               photos.map((url, i) => (
-                <img 
-                  key={i} 
-                  src={url} 
-                  className={`w-full ${layout.layout === 'single' ? 'h-96' : 'h-64'} object-cover rounded-2xl shadow-lg`} 
-                  alt={`Photo ${i + 1}`} 
+                <img
+                  key={i}
+                  src={url}
+                  className={`w-full ${layout.layout === 'single' ? 'h-96' : 'h-64'} object-cover rounded-2xl shadow-lg`}
+                  alt={`Photo ${i + 1}`}
                 />
               ))
             )}
           </div>
         )}
-        
+
         {/* 文字描述區 */}
         <div className="text-center max-w-lg mx-auto">
-          <UniversalDesigner 
-            label="日誌" 
-            html={item.thoughts} 
-            className="text-xl font-serif italic text-stone-700 leading-relaxed" 
-            onSave={(v) => onUpdate('thoughts', v)} 
+          <UniversalDesigner
+            label="日誌"
+            html={item.thoughts}
+            className="text-xl font-serif italic text-stone-700 leading-relaxed"
+            onSave={(v) => onUpdate('thoughts', v)}
           />
         </div>
-        
+
         {/* 底部留白 */}
         <div className="h-24"></div>
       </div>
@@ -161,8 +161,8 @@ export default function TravelBuddies() {
       alert('無法加載數據: ' + error.message)
     }
     if (data) setItinerary(data.sort((a, b) => {
-        const clean = (s: string) => s ? s.replace(/<[^>]*>/g, '').trim() : ""
-        return new Date(clean(a.date)).getTime() - new Date(clean(b.date)).getTime()
+      const clean = (s: string) => s ? s.replace(/<[^>]*>/g, '').trim() : ""
+      return new Date(clean(a.date)).getTime() - new Date(clean(b.date)).getTime()
     }))
     setLoading(false)
   }
@@ -180,62 +180,62 @@ export default function TravelBuddies() {
   // --- 【功能升級：多圖上傳 + 錯誤處理】 ---
   async function handleBatchUpload(id: string, files: FileList | null, currentPhotos: string[]) {
     if (!files || files.length === 0) return;
-    
+
     setUploading(true);
     console.log(`📸 開始上傳 ${files.length} 張照片...`);
-    
+
     try {
       const uploadedUrls: string[] = [];
-      
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const timestamp = Date.now();
         const path = `uploads/${id}-${timestamp}-${i}-${file.name}`;
-        
+
         console.log(`⬆️ 上傳第 ${i + 1}/${files.length} 張: ${file.name}`);
-        
+
         const { data, error: uploadError } = await supabase.storage
           .from('honeymoon-photos')
           .upload(path, file, {
             cacheControl: '3600',
             upsert: false
           });
-        
+
         if (uploadError) {
           console.error(`❌ 上傳失敗 (${file.name}):`, uploadError);
           throw uploadError;
         }
-        
+
         const { data: { publicUrl } } = supabase.storage
           .from('honeymoon-photos')
           .getPublicUrl(path);
-        
+
         uploadedUrls.push(publicUrl);
         console.log(`✅ 上傳成功: ${publicUrl}`);
       }
-      
+
       const newPhotos = [...(currentPhotos || []), ...uploadedUrls];
       console.log(`💾 更新數據庫，總共 ${newPhotos.length} 張照片`);
-      
+
       const { error: updateError } = await supabase
         .from('honeymoon_itinerary')
         .update({ photo_urls: newPhotos })
         .eq('id', id);
-      
+
       if (updateError) {
         console.error('❌ 數據庫更新錯誤:', updateError);
         throw updateError;
       }
-      
+
       // 更新本地狀態
-      const updated = itinerary.map(item => 
+      const updated = itinerary.map(item =>
         item.id === id ? { ...item, photo_urls: newPhotos } : item
       );
       setItinerary(updated);
-      
+
       console.log('🎉 上傳完成！');
       alert(`✅ 成功上傳 ${uploadedUrls.length} 張照片！`);
-      
+
     } catch (error: any) {
       console.error('❌ 上傳過程出錯:', error);
       alert('上傳失敗: ' + (error.message || '未知錯誤'));
@@ -247,48 +247,48 @@ export default function TravelBuddies() {
   async function addJourney() {
     const { data } = await supabase.from('honeymoon_itinerary').insert([{ title: '<div>New Day</div>', photo_urls: [] }]).select()
     if (data) {
-        setItinerary([...itinerary, data[0]])
-        setCurrentPage(itinerary.length + 1)
+      setItinerary([...itinerary, data[0]])
+      setCurrentPage(itinerary.length + 1)
     }
   }
 
   async function deleteJourney(id: string) {
     if (!confirm('確定要刪除這個行程嗎？')) return;
-    
+
     const { error } = await supabase.from('honeymoon_itinerary').delete().eq('id', id)
     if (error) {
       console.error('❌ 刪除失敗:', error)
       alert('刪除失敗: ' + error.message)
       return
     }
-    
+
     const updated = itinerary.filter(item => item.id !== id)
     setItinerary(updated)
-    
+
     // 如果刪除的是當前頁，跳到前一頁
     if (currentPage > 0 && currentPage >= updated.length + 1) {
       setCurrentPage(currentPage - 1)
     }
-    
+
     alert('✅ 刪除成功！')
   }
 
   // --- 【導出為 Canva 素材包】3x 高清圖片 + JSON 數據 + ZIP 打包 ---
   async function exportToCanva() {
     if (exporting) return;
-    
+
     setExporting(true);
     setExportProgress('準備導出...');
     console.log('📦 開始導出 Canva 素材包...');
-    
+
     try {
       const zip = new JSZip();
       const imagesFolder = zip.folder('images');
-      
+
       if (!imagesFolder) {
         throw new Error('無法創建圖片文件夾');
       }
-      
+
       // 準備導出數據
       const exportData = {
         version: '1.0',
@@ -296,7 +296,7 @@ export default function TravelBuddies() {
         backgroundColor: bgColor,
         pages: [] as any[]
       };
-      
+
       // 創建臨時渲染容器
       const container = document.createElement('div');
       container.style.position = 'fixed';
@@ -305,15 +305,15 @@ export default function TravelBuddies() {
       container.style.width = '550px';
       container.style.aspectRatio = '1/1.41';
       document.body.appendChild(container);
-      
+
       // 遍歷所有頁面並渲染為圖片
       for (let idx = 0; idx < allPages.length; idx++) {
         const page = allPages[idx];
         const pageNum = idx.toString().padStart(2, '0');
-        
+
         setExportProgress(`正在渲染第 ${idx + 1}/${allPages.length} 頁...`);
         console.log(`🎨 渲染第 ${idx + 1}/${allPages.length} 頁: ${page.type}`);
-        
+
         // 創建頁面元素
         container.innerHTML = '';
         const pageElement = document.createElement('div');
@@ -323,17 +323,17 @@ export default function TravelBuddies() {
         pageElement.style.borderRadius = '3rem';
         pageElement.style.overflow = 'hidden';
         pageElement.style.position = 'relative';
-        
+
         if (page.type === 'cover') {
           // 封面頁
           pageElement.innerHTML = `
             <div style="position: absolute; inset: 0; overflow: hidden; border-radius: 3rem;">
-              <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" 
+              <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/honeymoon-photos/cover.png" 
                    style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;"
                    crossorigin="anonymous" />
             </div>
           `;
-          
+
           exportData.pages.push({
             pageNumber: idx,
             type: 'cover',
@@ -376,7 +376,7 @@ export default function TravelBuddies() {
               </div>
             </div>
           `;
-          
+
           exportData.pages.push({
             pageNumber: idx,
             type: 'itinerary',
@@ -393,9 +393,9 @@ export default function TravelBuddies() {
             }
           });
         }
-        
+
         container.appendChild(pageElement);
-        
+
         // 等待圖片加載
         const images = pageElement.querySelectorAll('img');
         await Promise.all(
@@ -409,10 +409,10 @@ export default function TravelBuddies() {
             });
           })
         );
-        
+
         // 短暫延遲確保渲染完成
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // 將頁面轉換為高清圖片（3x 分辨率）
         try {
           const dataUrl = await toPng(pageElement, {
@@ -421,7 +421,7 @@ export default function TravelBuddies() {
             backgroundColor: bgColor,
             cacheBust: true
           });
-          
+
           // 將 base64 轉換為 binary
           const base64Data = dataUrl.split(',')[1];
           const binaryData = atob(base64Data);
@@ -429,26 +429,26 @@ export default function TravelBuddies() {
           for (let i = 0; i < binaryData.length; i++) {
             arrayBuffer[i] = binaryData.charCodeAt(i);
           }
-          
+
           // 添加到 ZIP
           const filename = page.type === 'cover' ? 'cover.png' : `page-${pageNum}.png`;
           imagesFolder.file(filename, arrayBuffer, { binary: true });
-          
+
           console.log(`✅ 第 ${idx + 1} 頁渲染完成: ${filename}`);
         } catch (err) {
           console.error(`❌ 渲染第 ${idx + 1} 頁失敗:`, err);
           throw err;
         }
       }
-      
+
       // 清理臨時容器
       document.body.removeChild(container);
-      
+
       setExportProgress('正在打包文件...');
-      
+
       // 添加 JSON 數據文件
       zip.file('data.json', JSON.stringify(exportData, null, 2));
-      
+
       // 添加 manifest 元數據
       const manifest = {
         name: 'Travel Buddies Export',
@@ -458,7 +458,7 @@ export default function TravelBuddies() {
         backgroundColor: bgColor
       };
       zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-      
+
       // 添加使用說明
       const readme = `Travel Buddies - Canva 素材包
 
@@ -477,23 +477,23 @@ export default function TravelBuddies() {
 總頁數：${allPages.length}
 `;
       zip.file('README.txt', readme);
-      
+
       // 生成 ZIP 文件並下載
       setExportProgress('正在生成 ZIP 文件...');
       console.log('🗜️ 生成 ZIP 文件...');
-      
-      const blob = await zip.generateAsync({ 
+
+      const blob = await zip.generateAsync({
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 9 }
       });
-      
+
       const filename = `travel-buddies-${new Date().toISOString().split('T')[0]}.zip`;
       saveAs(blob, filename);
-      
+
       console.log('🎉 導出完成！');
       alert(`✅ 導出成功！\n\n文件名：${filename}\n包含：${allPages.length} 頁高清圖片 + JSON 數據`);
-      
+
     } catch (error: any) {
       console.error('❌ 導出失敗:', error);
       alert(`導出失敗：${error.message || '未知錯誤'}`);
@@ -506,27 +506,27 @@ export default function TravelBuddies() {
   // --- 【導出為 PowerPoint】可編輯的文字和圖片 ---
   async function exportToPowerPoint() {
     if (exporting) return;
-    
+
     setExporting(true);
     setExportProgress('正在生成 PowerPoint...');
     console.log('📊 開始導出 PowerPoint...');
-    
+
     try {
       const pptx = new PptxGenJS();
-      
+
       // 設置幻燈片尺寸（16:9）
       pptx.layout = 'LAYOUT_16x9';
       pptx.author = 'Travel Buddies';
       pptx.title = '旅行日記';
       pptx.subject = '蜜月旅行回憶';
-      
+
       // 輔助函數：清理 HTML 標籤並保留文本
       const stripHtml = (html: string) => {
         if (!html) return '';
         const doc = new DOMParser().parseFromString(html, 'text/html');
         return doc.body.textContent || '';
       };
-      
+
       // 輔助函數：將 URL 轉換為 base64
       const imageToBase64 = async (url: string): Promise<string> => {
         try {
@@ -543,22 +543,22 @@ export default function TravelBuddies() {
           return '';
         }
       };
-      
+
       // 遍歷所有頁面
       for (let idx = 0; idx < allPages.length; idx++) {
         const page = allPages[idx];
         setExportProgress(`正在處理第 ${idx + 1}/${allPages.length} 頁...`);
         console.log(`📄 處理第 ${idx + 1}/${allPages.length} 頁`);
-        
+
         const slide = pptx.addSlide();
-        
+
         // 設置背景顏色
         slide.background = { color: bgColor.replace('#', '') };
-        
+
         if (page.type === 'cover') {
           // 封面頁 - 添加封面圖片
           try {
-            const coverImageBase64 = await imageToBase64('https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png');
+            const coverImageBase64 = await imageToBase64(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/honeymoon-photos/cover.png`);
             if (coverImageBase64) {
               slide.addImage({
                 data: coverImageBase64,
@@ -575,7 +575,7 @@ export default function TravelBuddies() {
           // 內容頁
           const item = page as any;
           const template = item.template || 'classic';
-          
+
           if (template === 'minimal') {
             // 極簡模板布局
             // 日期標籤（左上角）
@@ -586,7 +586,7 @@ export default function TravelBuddies() {
               color: '78716C',
               bold: true
             });
-            
+
             // 標題（居中）
             slide.addText(stripHtml(item.title), {
               x: 1,
@@ -599,7 +599,7 @@ export default function TravelBuddies() {
               align: 'center',
               fontFace: 'Georgia'
             });
-            
+
             // 副標題（居中）
             if (item.guideline) {
               slide.addText(stripHtml(item.guideline), {
@@ -612,14 +612,14 @@ export default function TravelBuddies() {
                 align: 'center'
               });
             }
-            
+
             // 照片區域 - 智能布局
             const photos = item.photo_urls || [];
             const photoCount = photos.length;
-            
+
             if (photoCount > 0) {
               setExportProgress(`正在下載第 ${idx + 1} 頁的照片...`);
-              
+
               if (photoCount === 1) {
                 // 1張：居中大圖
                 const imgData = await imageToBase64(photos[0]);
@@ -638,7 +638,7 @@ export default function TravelBuddies() {
                 // 3張：1大2小
                 const img1 = await imageToBase64(photos[0]);
                 if (img1) slide.addImage({ data: img1, x: 1, y: 3.5, w: 8, h: 3 });
-                
+
                 for (let i = 1; i < 3; i++) {
                   const imgData = await imageToBase64(photos[i]);
                   if (imgData) {
@@ -657,7 +657,7 @@ export default function TravelBuddies() {
                 }
               }
             }
-            
+
             // 日誌描述（底部居中）
             if (item.thoughts) {
               slide.addText(stripHtml(item.thoughts), {
@@ -683,7 +683,7 @@ export default function TravelBuddies() {
               italic: true,
               fontFace: 'Georgia'
             });
-            
+
             // 標題
             slide.addText(stripHtml(item.title), {
               x: 0.5,
@@ -695,7 +695,7 @@ export default function TravelBuddies() {
               color: '1C1917',
               fontFace: 'Georgia'
             });
-            
+
             // 提醒框
             if (item.guideline) {
               slide.addText(stripHtml(item.guideline), {
@@ -708,13 +708,13 @@ export default function TravelBuddies() {
                 fill: { color: 'FFFFFF99' }
               });
             }
-            
+
             // 照片
             const photos = item.photo_urls || [];
             if (photos.length > 0) {
               setExportProgress(`正在下載第 ${idx + 1} 頁的照片...`);
               const maxPhotos = Math.min(2, photos.length);
-              
+
               for (let i = 0; i < maxPhotos; i++) {
                 const imgData = await imageToBase64(photos[i]);
                 if (imgData) {
@@ -728,7 +728,7 @@ export default function TravelBuddies() {
                 }
               }
             }
-            
+
             // 日誌
             if (item.thoughts) {
               slide.addText(stripHtml(item.thoughts), {
@@ -745,15 +745,15 @@ export default function TravelBuddies() {
           }
         }
       }
-      
+
       // 生成並下載
       setExportProgress('正在生成文件...');
       const filename = `travel-buddies-${new Date().toISOString().split('T')[0]}.pptx`;
       await pptx.writeFile({ fileName: filename });
-      
+
       console.log('🎉 PowerPoint 導出完成！');
       alert(`✅ PowerPoint 導出成功！\n\n文件名：${filename}\n\n💡 使用方法：\n1. 上傳到 Google Drive\n2. 右鍵 → "打開方式" → "Google 幻燈片"\n3. 即可在線編輯！`);
-      
+
     } catch (error: any) {
       console.error('❌ PowerPoint 導出失敗:', error);
       alert(`PowerPoint 導出失敗：${error.message || '未知錯誤'}`);
@@ -771,7 +771,7 @@ export default function TravelBuddies() {
 
   return (
     <div style={{ backgroundColor: bgColor }} className="h-screen w-screen overflow-hidden text-stone-800 font-sans relative">
-      
+
       {/* 【一鍵成書：列印邏輯】強制全本背景色與分頁 */}
       <style jsx global>{`
         @media print {
@@ -845,86 +845,85 @@ export default function TravelBuddies() {
         >
           {/* 書本容器：黃金比例且內部捲動 */}
           <div className="w-full max-w-[550px] aspect-[1/1.41] bg-white/40 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white/60 flex flex-col overflow-hidden relative">
-            
+
             {allPages[currentPage].type === 'cover' ? (
               // 【封面：Full 版 - 純圖片，無標題】
               <div className="absolute inset-0 overflow-hidden rounded-[3rem]">
-                 <img src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" className="absolute inset-0 w-full h-full object-cover" />
+                <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/honeymoon-photos/cover.png`} className="absolute inset-0 w-full h-full object-cover" />
               </div>
             ) : (
               // 【行程內容頁 - 根據模板類型渲染】
               (allPages[currentPage] as any).template === 'minimal' ? (
-                <MinimalTemplate 
-                  item={allPages[currentPage] as any} 
+                <MinimalTemplate
+                  item={allPages[currentPage] as any}
                   pageNum={currentPage}
                   onUpdate={(field, value) => handleUpdate((allPages[currentPage] as any).id, field, value)}
                 />
               ) : (
-              // 【經典模板 - 原有排版】
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="p-8 pb-0 flex items-center gap-4 flex-shrink-0">
-                  <span className="text-3xl font-serif italic text-stone-400/80">0{currentPage}</span>
-                  <div className="h-[1px] flex-1 bg-stone-300/50" />
-                </div>
-                
-                {/* 內容捲動區：只有這個區域可以滾動，背景固定 */}
-                <div className="flex-1 overflow-y-auto overflow-x-hidden p-8 pt-6 space-y-8 touch-pan-y">
-                   <UniversalDesigner 
-                     label="標題" 
-                     html={(allPages[currentPage] as any).title} 
-                     onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'title', v)} 
-                     className="text-3xl md:text-5xl font-serif font-bold leading-tight text-stone-800 mb-2" 
-                   />
-                   
-                   <div className="bg-white/60 p-6 rounded-[2rem] shadow-sm border border-stone-200/50">
-                     <UniversalDesigner 
-                       label="提醒" 
-                       html={(allPages[currentPage] as any).guideline} 
-                       onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'guideline', v)} 
-                       className="text-base text-stone-600 leading-relaxed" 
-                     />
-                   </div>
-                   
-                   <div className="grid grid-cols-1 gap-5">
+                // 【經典模板 - 原有排版】
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <div className="p-8 pb-0 flex items-center gap-4 flex-shrink-0">
+                    <span className="text-3xl font-serif italic text-stone-400/80">0{currentPage}</span>
+                    <div className="h-[1px] flex-1 bg-stone-300/50" />
+                  </div>
+
+                  {/* 內容捲動區：只有這個區域可以滾動，背景固定 */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden p-8 pt-6 space-y-8 touch-pan-y">
+                    <UniversalDesigner
+                      label="標題"
+                      html={(allPages[currentPage] as any).title}
+                      onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'title', v)}
+                      className="text-3xl md:text-5xl font-serif font-bold leading-tight text-stone-800 mb-2"
+                    />
+
+                    <div className="bg-white/60 p-6 rounded-[2rem] shadow-sm border border-stone-200/50">
+                      <UniversalDesigner
+                        label="提醒"
+                        html={(allPages[currentPage] as any).guideline}
+                        onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'guideline', v)}
+                        className="text-base text-stone-600 leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5">
                       {(allPages[currentPage] as any).photo_urls?.map((url: string, i: number) => (
                         <div key={i} className="relative">
                           <img src={url} className="w-full rounded-[2rem] shadow-lg border-[8px] border-white object-cover" alt={`Photo ${i + 1}`} />
                         </div>
                       ))}
-                   </div>
-                   
-                   <div className="bg-stone-50/50 p-6 rounded-[2rem]">
-                     <UniversalDesigner 
-                       label="日誌" 
-                       html={(allPages[currentPage] as any).thoughts} 
-                       className="text-lg md:text-xl font-serif italic text-stone-600 leading-relaxed" 
-                       onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'thoughts', v)} 
-                     />
-                   </div>
-                   
-                   {/* 底部留白，確保內容不會被按鈕遮擋 */}
-                   <div className="h-24"></div>
-                </div>
+                    </div>
 
-                {/* 底部功能區 - 固定在底部 */}
-                <div className="p-6 border-t border-white/20 bg-white/10 backdrop-blur-md flex gap-4 no-print flex-shrink-0">
-                   <label className={`flex-1 text-center py-4 rounded-full text-[10px] font-bold tracking-widest shadow-xl transition-colors ${
-                     uploading 
-                       ? 'bg-stone-400 text-white cursor-not-allowed' 
-                       : 'bg-stone-900 text-white cursor-pointer hover:bg-stone-800'
-                   }`}>
-                      {uploading ? '⏳ 上傳中...' : '📷 上傳照片'}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        multiple 
-                        className="hidden" 
-                        disabled={uploading}
-                        onChange={(e) => handleBatchUpload((allPages[currentPage] as any).id, e.target.files, (allPages[currentPage] as any).photo_urls)} 
+                    <div className="bg-stone-50/50 p-6 rounded-[2rem]">
+                      <UniversalDesigner
+                        label="日誌"
+                        html={(allPages[currentPage] as any).thoughts}
+                        className="text-lg md:text-xl font-serif italic text-stone-600 leading-relaxed"
+                        onSave={(v) => handleUpdate((allPages[currentPage] as any).id, 'thoughts', v)}
                       />
-                   </label>
+                    </div>
+
+                    {/* 底部留白，確保內容不會被按鈕遮擋 */}
+                    <div className="h-24"></div>
+                  </div>
+
+                  {/* 底部功能區 - 固定在底部 */}
+                  <div className="p-6 border-t border-white/20 bg-white/10 backdrop-blur-md flex gap-4 no-print flex-shrink-0">
+                    <label className={`flex-1 text-center py-4 rounded-full text-[10px] font-bold tracking-widest shadow-xl transition-colors ${uploading
+                        ? 'bg-stone-400 text-white cursor-not-allowed'
+                        : 'bg-stone-900 text-white cursor-pointer hover:bg-stone-800'
+                      }`}>
+                      {uploading ? '⏳ 上傳中...' : '📷 上傳照片'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => handleBatchUpload((allPages[currentPage] as any).id, e.target.files, (allPages[currentPage] as any).photo_urls)}
+                      />
+                    </label>
+                  </div>
                 </div>
-              </div>
               )
             )}
             <div className="absolute bottom-6 left-0 right-0 text-center font-serif text-[10px] text-stone-300 no-print">PAGE {currentPage + 1} / {allPages.length}</div>
@@ -933,17 +932,17 @@ export default function TravelBuddies() {
       </AnimatePresence>
 
       {/* 【一鍵成書：隱藏列印容器】渲染全部頁面供 PDF 使用 */}
-      <div className="hidden print-container" style={{display: 'none'}}>
+      <div className="hidden print-container" style={{ display: 'none' }}>
         {allPages.map((page, idx) => (
           <div key={`print-${idx}`} className="print-page">
             {page.type === 'cover' ? (
-              <div className="flex-1 relative" style={{margin: '-20mm', width: '210mm', height: '297mm'}}>
-                 <img 
-                   src="https://bgvwsiqgbblgiggjlnfi.supabase.co/storage/v1/object/public/honeymoon-photos/cover.png" 
-                   className="w-full h-full object-cover" 
-                   style={{width: '210mm', height: '297mm'}}
-                   alt="Cover" 
-                 />
+              <div className="flex-1 relative" style={{ margin: '-20mm', width: '210mm', height: '297mm' }}>
+                <img
+                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/honeymoon-photos/cover.png`}
+                  className="w-full h-full object-cover"
+                  style={{ width: '210mm', height: '297mm' }}
+                  alt="Cover"
+                />
               </div>
             ) : (
               <div className="space-y-6">
@@ -955,7 +954,7 @@ export default function TravelBuddies() {
                 <div className="bg-white/40 p-8 rounded-[2rem] text-xl leading-relaxed mb-6" dangerouslySetInnerHTML={{ __html: (page as any).guideline }} />
                 <div className="grid grid-cols-1 gap-5">
                   {(page as any).photo_urls?.map((url: string, i: number) => (
-                    <img key={i} src={url} className="w-full rounded-[2rem] border-[8px] border-white object-cover" style={{maxHeight: '400px'}} />
+                    <img key={i} src={url} className="w-full rounded-[2rem] border-[8px] border-white object-cover" style={{ maxHeight: '400px' }} />
                   ))}
                 </div>
                 <div className="text-2xl font-serif italic text-stone-600 leading-relaxed mt-6" dangerouslySetInnerHTML={{ __html: (page as any).thoughts }} />
@@ -973,9 +972,9 @@ export default function TravelBuddies() {
             <div className="text-2xl font-bold text-stone-800 mb-4">正在導出素材包</div>
             <div className="text-lg text-stone-600 mb-8">{exportProgress}</div>
             <div className="flex items-center justify-center gap-2">
-              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-3 h-3 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
             </div>
           </div>
         </div>
@@ -985,26 +984,25 @@ export default function TravelBuddies() {
       <div className="fixed bottom-8 right-8 flex items-center gap-5 no-print z-[300]">
         <button onClick={addJourney} className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-3xl hover:bg-stone-50 transition-colors">+</button>
         {allPages[currentPage].type !== 'cover' && (
-          <button 
-            onClick={() => deleteJourney((allPages[currentPage] as any).id)} 
+          <button
+            onClick={() => deleteJourney((allPages[currentPage] as any).id)}
             className="w-14 h-14 bg-red-500 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl hover:bg-red-600 transition-colors"
           >
             🗑️
           </button>
         )}
         <div className="bg-white/90 backdrop-blur-md rounded-full px-6 py-4 shadow-2xl flex items-center gap-4">
-           <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" />
-           <button 
-             onClick={exportToPowerPoint}
-             disabled={exporting}
-             className={`text-[10px] font-black tracking-widest uppercase ${
-               exporting ? 'text-stone-400 cursor-not-allowed' : 'text-stone-900 hover:text-stone-600'
-             }`}
-           >
-             📊 導出 PPT
-           </button>
-           <div className="w-[1px] h-6 bg-stone-300" />
-           <button onClick={() => window.print()} className="text-[10px] font-black tracking-widest uppercase">一鍵成書 (PDF)</button>
+          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-none" />
+          <button
+            onClick={exportToPowerPoint}
+            disabled={exporting}
+            className={`text-[10px] font-black tracking-widest uppercase ${exporting ? 'text-stone-400 cursor-not-allowed' : 'text-stone-900 hover:text-stone-600'
+              }`}
+          >
+            📊 導出 PPT
+          </button>
+          <div className="w-[1px] h-6 bg-stone-300" />
+          <button onClick={() => window.print()} className="text-[10px] font-black tracking-widest uppercase">一鍵成書 (PDF)</button>
         </div>
       </div>
     </div>
